@@ -6,11 +6,23 @@ struct LyricsStageView: View {
     let typography: LyricTypography
     let clock: PlaybackClock
     let offset: TimeInterval
+    let director: VisualDirector
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 60, paused: !clock.isRunning)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 60, paused: !clock.isRunning && !director.isPreviewing)) { context in
             let time = clock.position(at: context.date) + offset
             let position = box.locate(at: time)
+            let motion = director.lyricSnapshot()
+            var liveTypography = typography
+            let _ = {
+                liveTypography.motion = motion.style
+                liveTypography.beatImpulse = (motion.beatImpulse * 50).rounded() / 50
+                liveTypography.beatCount = motion.beatCount
+            }()
+            // Calm profiles float the whole stack very slowly instead of jumping.
+            let calm = max(0, 1 - motion.style.tempo)
+            let floatOffset: CGFloat = (typography.reduceMotion || calm <= 0.05) ? 0
+                : CGFloat(sin(context.date.timeIntervalSinceReferenceDate * 0.45) * 5 * calm)
             let current = position.lineIndex.flatMap { box.sungIndex(forDocumentLine: $0) }
             let inBreak = position.isInBreak
             // During a break the *next* line is centred as an upcoming line.
@@ -24,9 +36,10 @@ struct LyricsStageView: View {
                            anchorIsCurrent: anchorIsCurrent,
                            activeWordIndex: anchorIsCurrent ? position.wordIndex : nil,
                            wordProgress: position.wordProgress,
-                           typography: typography,
+                           typography: liveTypography,
                            showBreathing: inBreak,
-                           breathCountdown: position.timeUntilNextLine)
+                           breathCountdown: position.timeUntilNextLine,
+                           floatOffset: floatOffset)
         }
     }
 }

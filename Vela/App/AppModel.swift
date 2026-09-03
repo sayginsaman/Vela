@@ -87,6 +87,8 @@ final class AppModel {
     let settingsStore: SettingsStore
     let audio = AudioEngine()
     let windowController = WindowController()
+    /// Produces the smoothed per-frame visual state for the renderers.
+    let director = VisualDirector()
 
     @ObservationIgnored private let demoSource: DemoMusicSource
     @ObservationIgnored private let coordinator: MusicSourceCoordinator
@@ -99,6 +101,10 @@ final class AppModel {
     @ObservationIgnored private var keyMonitor: Any?
     @ObservationIgnored private var lastPointerReschedule: TimeInterval = 0
     @ObservationIgnored private var started = false
+    @ObservationIgnored private let detector = ProfileDetector()
+    @ObservationIgnored private var detectionTask: Task<Void, Never>?
+    @ObservationIgnored private var trackGeneration = 0
+    @ObservationIgnored private var reduceMotion = false
 
     // MARK: Playback state
     private(set) var playback: PlaybackSnapshot = .empty
@@ -112,10 +118,22 @@ final class AppModel {
     // MARK: Visual state
     private(set) var artwork: CGImage?
     private(set) var backdrop: CGImage?
+    private(set) var backdropSharp: CGImage?
+    /// Increments whenever new backdrops are installed, so the renderer re-uploads once.
+    private(set) var artworkGeneration = 0
     private(set) var extractedPalette: Palette = .fallback
     private(set) var lyrics: LyricsState = .idle
     private(set) var transitionID = 0
     private(set) var increaseContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+    private(set) var reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+
+    // MARK: Visual profile state
+    private(set) var detection: ProfileDetection = .pending
+    /// Audio-heuristic estimate for the diagnostics section (also computed when genre decides).
+    private(set) var audioEstimate: ProfileScores = .neutral
+    /// Latest downsampled features for diagnostics (4 Hz, never per frame).
+    private(set) var diagnostics: MusicFeatureSnapshot = .silent
+    private(set) var previewProfile: VisualProfile?
 
     // MARK: UI state
     var isFullscreen = false
@@ -175,12 +193,6 @@ final class AppModel {
 
     var currentPosition: TimeInterval { clock.position(at: Date()) }
 
-    /// Tempo used by the demo audio simulator.
-    private var currentBPM: Double {
-        guard let track, track.source == .demo, let demo = DemoCatalog.track(withID: track.id) else { return 100 }
-        return demo.bpm
-    }
-
     var lyricsQualityDescription: String? {
         guard case .ready(let box) = lyrics else { return nil }
         switch box.document.quality {
@@ -191,6 +203,46 @@ final class AppModel {
         }
     }
 
+    /// The profile in force: a manual lock, otherwise Auto's detection (Pop until settled).
+    var effectiveProfile: VisualProfile {
+        ProfileResolver.resolve(selection: settings.visualProfile, detection: detection)
+    }
+
+    /// Demo audio fixture for the current track (defaults to Pop for real players).
+    private var currentFixture: ProfileFixture {
+        guard let track, track.source == .demo, let demo = DemoCatalog.track(withID: track.id) else { return ProfileFixture(profile: .pop) }
+        return demo.fixture
+    }
+
+    func setReduceMotion(_ value: Bool) {
+        guard value != reduceMotion else { return }
+        reduceMotion = value
+        pushVisualInputs()
+    }
+
+    /// Sends every discrete input the director needs. Cheap; called whenever one changes.
+    func pushVisualInputs() {
+        let s = settings
+        var inputs = VisualDirector.Inputs()
+        inputs.profile = effectiveProfile
+        inputs.palette = palette
+        inputs.reactive = s.reactiveIntensity
+        inputs.background = s.backgroundReaction
+        inputs.edge = s.edgeReaction
+        inputs.lyric = s.lyricMotionIntensity
+        inputs.particlesEnabled = s.particlesEnabled
+        inputs.reduceMotion = reduceMotion
+        inputs.reduceIntenseMotion = s.reduceIntenseMotion
+        inputs.reduceEffects = s.reduceEffects
+        inputs.glowThickness = s.glowThickness
+        inputs.glowIntensity = s.glowIntensity
+        inputs.glowSpread = s.glowSpread
+        inputs.reactiveMotion = s.reactiveMotion
+        inputs.isPlaying = playback.isPlaying
+        inputs.trackGeneration = trackGeneration
+        director.update(inputs: inputs)
+    }
+
     // MARK: Lifecycle
 
     func start() {
@@ -199,9 +251,21 @@ final class AppModel {
         guard !Self.isRunningTests else { return }
         installKeyMonitor()
         NotificationCenter.default.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.increaseContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast }
+            Task { @MainActor [weak self] in
+                self?.increaseContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+                self?.reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+            }
         }
+        director.onPreviewEnded = { [weak self] in
+            Task { @MainActor [weak self] in self?.previewProfile = nil }
+        }
+        pushVisualInputs()
+        startDetectionLoop()
         if isDemoMode { Task { await demoSource.setEnabled(true) } }
+        // Developer hook: `VELA_DEMO_TRACK=<catalogue id>` starts straight into that demo fixture.
+        if let requested = ProcessInfo.processInfo.environment["VELA_DEMO_TRACK"], DemoCatalog.track(withID: requested) != nil {
+            selectDemoTrack(id: requested)
+        }
         eventTask = Task { [weak self] in
             guard let coordinator = self?.coordinator else { return }
             await coordinator.start()
@@ -215,6 +279,32 @@ final class AppModel {
             self.isFullscreen = value
             if value { self.showOverlay() }
         }
+    }
+
+    /// Samples the feature store four times a second for Auto detection and diagnostics.
+    /// Raw audio never reaches SwiftUI at buffer rate.
+    private func startDetectionLoop() {
+        detectionTask?.cancel()
+        detectionTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard let self, !Task.isCancelled else { return }
+                self.sampleDetection()
+            }
+        }
+    }
+
+    private func sampleDetection() {
+        let (snapshot, live) = audio.store.read()
+        diagnostics = live ? snapshot : .silent
+        guard live, playback.isPlaying, track != nil else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        if let changed = detector.ingest(snapshot, at: now) {
+            detection = changed
+            VelaLog.app.info("profile detection: \(changed.profile.rawValue, privacy: .public) \(changed.confidence, privacy: .public) via \(changed.source.rawValue, privacy: .public)")
+            pushVisualInputs()
+        }
+        audioEstimate = detector.audioEstimate
     }
 
     private func installKeyMonitor() {
@@ -239,10 +329,11 @@ final class AppModel {
         updated.apply(snapshot: snapshot)
         clock = updated
         capabilities = event.sourceKind == nil ? .none : await coordinator.activeCapabilities
-        audio.updateClock(clock, bpm: currentBPM)
+        audio.updateClock(clock, fixture: currentFixture)
         updateAudioMode()
         if wasPlaying != snapshot.isPlaying {
             if snapshot.isPlaying { scheduleHide() } else { showOverlay() }
+            pushVisualInputs()
         }
     }
 
@@ -251,15 +342,25 @@ final class AppModel {
         artworkTask?.cancel()
         track = newTrack
         transitionID &+= 1
+        trackGeneration &+= 1
+        detector.reset(trackID: newTrack?.identityKey, genre: newTrack?.genre)
+        detection = detector.detection
+        audioEstimate = .neutral
+        audio.resetAnalysis()
+        audio.updateClock(clock, fixture: currentFixture)
         guard let newTrack else {
             withAnimation(.easeInOut(duration: 1.0)) {
                 artwork = nil
                 backdrop = nil
+                backdropSharp = nil
+                artworkGeneration &+= 1
                 extractedPalette = .fallback
             }
             lyrics = .idle
+            pushVisualInputs()
             return
         }
+        pushVisualInputs()
         lyrics = .loading
         artworkTask = Task { [weak self] in
             guard let self else { return }
@@ -270,8 +371,11 @@ final class AppModel {
             withAnimation(.easeInOut(duration: 1.2)) {
                 self.artwork = image
                 self.backdrop = output.backdrop
+                self.backdropSharp = output.backdropSharp
+                self.artworkGeneration &+= 1
                 self.extractedPalette = output.palette
             }
+            self.pushVisualInputs()
         }
         lyricsTask = Task { [weak self] in
             guard let self else { return }
@@ -309,6 +413,7 @@ final class AppModel {
         var updated = clock
         updated.setRunning(!clock.isRunning)
         clock = updated
+        audio.updateClock(clock, fixture: currentFixture)
         Task { [coordinator] in
             do { try await coordinator.perform { try await $0.togglePlayPause() } }
             catch { await self.report(error) }
@@ -340,7 +445,7 @@ final class AppModel {
         var updated = clock
         updated.seek(to: clamped)
         clock = updated
-        audio.updateClock(clock, bpm: currentBPM)
+        audio.updateClock(clock, fixture: currentFixture)
         Task { [coordinator] in
             do { try await coordinator.perform { try await $0.seek(to: clamped) } }
             catch { await self.report(error) }
@@ -392,6 +497,7 @@ final class AppModel {
     // MARK: Settings hooks
 
     func settingsDidChange(from old: VelaSettings, to new: VelaSettings) {
+        pushVisualInputs()
         if old.preferredSource != new.preferredSource {
             if new.preferredSource == .demo {
                 setDemoMode(true)
@@ -575,19 +681,50 @@ final class AppModel {
         }
     }
 
-    // MARK: Glow parameters
+    // MARK: Demo fixtures
 
-    func glowParameters(reduceMotion: Bool) -> GlowParameters {
-        let s = settings
-        let base = 64.0 * s.glowThickness
-        return GlowParameters(gradient: palette.gradient,
-                              thickness: base,
-                              intensity: s.glowIntensity * (s.reduceEffects ? 0.65 : 1),
-                              spread: s.glowSpread,
-                              reactiveMotion: s.reactiveMotion && !s.reduceEffects,
-                              reduceMotion: reduceMotion,
-                              cornerRadius: windowController.contentCornerRadius,
-                              notchRect: windowController.notchRect(),
-                              breathing: audio.status != .capturing)
+    /// Jumps Demo Mode to a catalogue track (enabling Demo Mode if needed).
+    func selectDemoTrack(id: String) {
+        if !isDemoMode { setDemoMode(true) }
+        Task { [demoSource, coordinator] in
+            await demoSource.jump(toTrackID: id)
+            await coordinator.wake()
+        }
+        showOverlay()
+    }
+
+    /// Cycles through one representative demo track per visual profile.
+    func nextDemoFixture() {
+        let fixtures = DemoCatalog.profileFixtures
+        guard !fixtures.isEmpty else { return }
+        let currentIndex = fixtures.firstIndex { $0.id == track?.id } ?? -1
+        let next = fixtures[(currentIndex + 1) % fixtures.count]
+        selectDemoTrack(id: next.id)
+    }
+
+    // MARK: Visual profile actions
+
+    func cycleVisualProfile() {
+        let all = VisualProfileSelection.allCases
+        let index = all.firstIndex(of: settings.visualProfile) ?? 0
+        settings.visualProfile = all[(index + 1) % all.count]
+        showToast("Visual profile: \(settings.visualProfile.displayName)")
+    }
+
+    /// Plays a deterministic simulation of `profile` over the current scene without touching playback.
+    func startPreview(_ profile: VisualProfile) {
+        previewProfile = profile
+        director.startPreview(profile: profile, duration: 10)
+    }
+
+    func stopPreview() {
+        previewProfile = nil
+        director.stopPreview()
+    }
+
+    // MARK: Scene geometry
+
+    var sceneGeometry: SceneGeometry {
+        SceneGeometry(cornerRadius: windowController.contentCornerRadius, notchRect: windowController.notchRect())
     }
 }

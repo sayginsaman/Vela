@@ -67,7 +67,7 @@ struct NowPlayingOverlay: View {
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.black.opacity(0.28)))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.black.opacity(model.reduceTransparency ? 0.9 : 0.28)))
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.white.opacity(0.1)))
                 .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         )

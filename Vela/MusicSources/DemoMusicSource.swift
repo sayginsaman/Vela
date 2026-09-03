@@ -100,6 +100,15 @@ actor DemoMusicSource: MusicSource {
         anchorDate = Date()
     }
 
+    /// Jumps straight to a catalogue entry (used by the demo fixture picker).
+    func jump(toTrackID id: String) {
+        guard let target = tracks.firstIndex(where: { $0.id == id }) else { return }
+        index = target
+        anchorPosition = 0
+        anchorDate = Date()
+        playing = true
+    }
+
     func seek(to position: TimeInterval) async throws {
         anchorPosition = min(max(0, position), currentTrack.duration)
         anchorDate = Date()

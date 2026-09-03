@@ -17,21 +17,23 @@ struct SettingsOverlayView: View {
                 Divider().overlay(Color.white.opacity(0.08))
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
+                        visualProfileSection(model: $model)
                         lyricsSection(model: $model)
                         lightSection(model: $model)
                         playbackSection(model: $model)
+                        demoSection
                         permissionsSection
                         footer
                     }
                     .padding(22)
                 }
             }
-            .frame(width: 480)
-            .frame(maxHeight: 640)
+            .frame(width: 500)
+            .frame(maxHeight: 700)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(.regularMaterial)
-                    .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black.opacity(0.35)))
+                    .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black.opacity(self.model.reduceTransparency ? 0.92 : 0.35)))
                     .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Color.white.opacity(0.1)))
                     .shadow(color: .black.opacity(0.45), radius: 40, y: 20)
             )
@@ -56,6 +58,118 @@ struct SettingsOverlayView: View {
     }
 
     // MARK: Sections
+
+    private func visualProfileSection(model: Bindable<AppModel>) -> some View {
+        SettingsSection(title: "Visual profile") {
+            LabeledContent("Profile") {
+                Picker("Profile", selection: model.settings.visualProfile) {
+                    ForEach(VisualProfileSelection.allCases) { Text($0.displayName).tag($0) }
+                }
+                .labelsHidden()
+                .frame(width: 180)
+            }
+            Text(profileStatusText)
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(self.model.effectiveProfile.summary)
+                .font(.system(size: 11)).foregroundStyle(.tertiary)
+            SliderRow(title: "Reactivity", value: model.settings.reactiveIntensity, range: VelaSettings.reactionRange, format: { String(format: "%.0f%%", $0 * 100) })
+            SliderRow(title: "Background", value: model.settings.backgroundReaction, range: VelaSettings.reactionRange, format: { String(format: "%.0f%%", $0 * 100) })
+            SliderRow(title: "Edge light", value: model.settings.edgeReaction, range: VelaSettings.reactionRange, format: { String(format: "%.0f%%", $0 * 100) })
+            SliderRow(title: "Lyric motion", value: model.settings.lyricMotionIntensity, range: VelaSettings.reactionRange, format: { String(format: "%.0f%%", $0 * 100) })
+            Toggle("Particles", isOn: model.settings.particlesEnabled)
+            Toggle("Reduce intense motion", isOn: model.settings.reduceIntenseMotion)
+            HStack(spacing: 10) {
+                if let previewing = self.model.previewProfile {
+                    Label("Previewing \(previewing.displayName)…", systemImage: "eye").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Button("Stop") { self.model.stopPreview() }.controlSize(.small)
+                } else {
+                    Menu("Preview profile…") {
+                        ForEach(VisualProfile.allCases) { profile in
+                            Button(profile.displayName) { self.model.startPreview(profile) }
+                        }
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    Text("Ten-second simulation over the current scene; playback is untouched.")
+                        .font(.system(size: 11)).foregroundStyle(.tertiary)
+                }
+            }
+            DisclosureGroup("Analysis") {
+                diagnosticsGrid
+            }
+            .font(.system(size: 11))
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var profileStatusText: String {
+        let d = self.model.detection
+        let detected: String
+        switch d.source {
+        case .pending: detected = "Auto is listening… (Pop until it settles)"
+        case .genre: detected = "Auto: \(d.profile.displayName) from genre metadata"
+        case .audio: detected = String(format: "Auto: %@ from audio analysis · %.0f%% confidence", d.profile.displayName, d.confidence * 100)
+        case .fallback: detected = String(format: "Auto: Pop (no confident match · %.0f%%)", d.confidence * 100)
+        }
+        if let locked = self.model.settings.visualProfile.profile {
+            return "Locked to \(locked.displayName). \(detected)"
+        }
+        return detected
+    }
+
+    private var diagnosticsGrid: some View {
+        let f = self.model.diagnostics
+        let estimate = self.model.audioEstimate
+        let rows: [(String, String)] = [
+            ("Audio estimate", estimate.scores.isEmpty ? "—" : String(format: "%@ · %.0f%%", estimate.best.displayName, estimate.confidence * 100)),
+            ("Tempo", f.bpm > 0 ? String(format: "%.0f BPM · confidence %.0f%%", f.bpm, f.bpmConfidence * 100) : "—"),
+            ("Bass / mid balance", String(format: "%.2f", f.bassToMid)),
+            ("High energy", String(format: "%.2f", f.highEnergy)),
+            ("Spectral centroid", String(format: "%.2f", f.spectralCentroid)),
+            ("Spectral flux", String(format: "%.2f", f.spectralFlux)),
+            ("Onset density", String(format: "%.1f / s", f.onsetDensity)),
+            ("Transient strength", String(format: "%.2f", f.transientStrength)),
+            ("Dynamic range", String(format: "%.2f", f.dynamicRange)),
+            ("Loudness", String(format: "%.2f", f.averageLoudness)),
+            ("Rhythmic regularity", String(format: "%.2f", f.rhythmicRegularity)),
+        ]
+        return Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
+            ForEach(rows, id: \.0) { row in
+                GridRow {
+                    Text(row.0).foregroundStyle(.tertiary)
+                    Text(row.1).monospacedDigit()
+                }
+            }
+        }
+        .font(.system(size: 10.5))
+        .padding(.top, 4)
+    }
+
+    private var demoSection: some View {
+        SettingsSection(title: "Demo Mode") {
+            LabeledContent("Demo track") {
+                Picker("Demo track", selection: Binding(
+                    get: { self.model.isDemoMode ? (self.model.track?.id ?? "") : "" },
+                    set: { if !$0.isEmpty { self.model.selectDemoTrack(id: $0) } })) {
+                    Text(self.model.isDemoMode ? "Current" : "Choose…").tag("")
+                    ForEach(DemoCatalog.tracks) { track in
+                        Text("\(track.title) — \(track.fixtureProfile.displayName)").tag(track.id)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 240)
+            }
+            HStack {
+                Button("Next fixture  (⌘⇧N)") { self.model.nextDemoFixture() }
+                Toggle("Demo Mode  (⌘⇧D)", isOn: Binding(get: { self.model.isDemoMode }, set: { self.model.setDemoMode($0) }))
+            }
+            .controlSize(.small)
+            Text("Each demo track carries an audio fixture with its own musical personality, so every profile can be judged without a player, permissions or network.")
+                .font(.system(size: 11)).foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
 
     private func lyricsSection(model: Bindable<AppModel>) -> some View {
         SettingsSection(title: "Lyrics") {
@@ -122,7 +236,6 @@ struct SettingsOverlayView: View {
                 .frame(width: 160)
             }
             Toggle("Launch Vela at login", isOn: model.settings.launchAtLogin)
-            Toggle("Demo Mode  (⌘⇧D)", isOn: Binding(get: { self.model.isDemoMode }, set: { self.model.setDemoMode($0) }))
         }
     }
 

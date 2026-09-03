@@ -12,6 +12,8 @@ struct LyricLineStack: View {
     let typography: LyricTypography
     let showBreathing: Bool
     let breathCountdown: TimeInterval?
+    /// Slow vertical float applied by calm profiles (points).
+    var floatOffset: CGFloat = 0
 
     @State private var heights: [Int: CGFloat] = [:]
 
@@ -49,13 +51,13 @@ struct LyricLineStack: View {
                     let distance = index - anchor
                     LyricLineView(line: lines[index], role: role(for: index),
                                   activeWordIndex: index == anchor ? activeWordIndex : nil,
-                                  wordProgress: wordProgress, typography: typography,
+                                  wordProgress: wordProgress, typography: index == anchor ? typography : typography.still,
                                   maxWidth: proxy.size.width * 0.84)
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { heights[lines[index].id] = $0 }
-                        .modifier(NeighbourStyle(distance: distance, typography: typography))
-                        .offset(y: offset(for: index))
-                        .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: typography.reduceMotion ? 0 : 36)),
-                                                removal: .opacity.combined(with: .offset(y: typography.reduceMotion ? 0 : -36))))
+                        .modifier(NeighbourStyle(distance: distance, typography: typography.still))
+                        .offset(y: offset(for: index) + floatOffset)
+                        .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: typography.reduceMotion ? 0 : 36 * CGFloat(0.6 + typography.motion.tempo * 0.4))),
+                                                removal: .opacity.combined(with: .offset(y: typography.reduceMotion ? 0 : -36 * CGFloat(0.6 + typography.motion.tempo * 0.4)))))
                         .id(lines[index].id)
                 }
                 if showBreathing {
@@ -66,7 +68,7 @@ struct LyricLineStack: View {
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
-            .animation(typography.reduceMotion ? .easeInOut(duration: 0.35) : .spring(response: 0.62, dampingFraction: 0.86), value: anchor)
+            .animation(typography.motion.lineAnimation, value: anchor)
             .animation(.easeInOut(duration: 0.3), value: showBreathing)
         }
         .clipped()
@@ -101,26 +103,33 @@ private struct NeighbourStyle: ViewModifier {
         }
     }
 
+    private var depth: Double { typography.motion.lineDepth }
+
     private var scale: CGFloat {
         guard distance != 0 else { return 1 }
         switch typography.style {
-        case .focus: return 0.92
-        case .bloom: return 0.88
-        case .drift: return 1 - 0.07 * d
+        case .focus: return CGFloat(0.94 - 0.06 * depth)
+        case .bloom: return CGFloat(0.9 - 0.06 * depth)
+        case .drift: return 1 - CGFloat(0.05 + 0.05 * depth) * CGFloat(d)
+        }
+    }
+
+    /// Perspective tilt of neighbouring lines: always on in Drift, profile-driven elsewhere.
+    private var tilt: Double {
+        guard !typography.reduceMotion else { return 0 }
+        switch typography.style {
+        case .drift: return Double(-distance) * (9 + 9 * depth)
+        case .focus, .bloom: return depth > 0.4 ? Double(-distance) * (depth - 0.4) * 14 : 0
         }
     }
 
     func body(content: Content) -> some View {
-        let base = content
+        content
             .compositingGroup()
             .blur(radius: blur)
             .opacity(opacity)
             .scaleEffect(scale)
-        if typography.style == .drift {
-            base.rotation3DEffect(.degrees(typography.reduceMotion ? 0 : Double(-distance) * 13), axis: (x: 1, y: 0, z: 0), perspective: 0.55)
-        } else {
-            base
-        }
+            .rotation3DEffect(.degrees(tilt), axis: (x: 1, y: 0, z: 0), perspective: 0.55)
     }
 }
 

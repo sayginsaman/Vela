@@ -8,18 +8,22 @@ import CoreImage.CIFilterBuiltins
 enum ArtworkProcessor {
     struct Output: Sendable {
         var palette: Palette
+        /// Heavily blurred backdrop (the calm state).
         var backdrop: CGImage?
+        /// Lightly blurred backdrop the renderer mixes in as loudness rises.
+        var backdropSharp: CGImage?
     }
 
     static func process(_ image: CGImage?) async -> Output {
         await Task.detached(priority: .userInitiated) {
             let palette = PaletteExtractor.palette(from: image)
-            let backdrop = image.flatMap { makeBackdrop(from: $0) }
-            return Output(palette: palette, backdrop: backdrop)
+            let backdrop = image.flatMap { makeBackdrop(from: $0, blurRadius: 22) }
+            let sharp = image.flatMap { makeBackdrop(from: $0, size: 320, blurRadius: 7) }
+            return Output(palette: palette, backdrop: backdrop, backdropSharp: sharp)
         }.value
     }
 
-    static func makeBackdrop(from image: CGImage, size: Int = 220) -> CGImage? {
+    static func makeBackdrop(from image: CGImage, size: Int = 220, blurRadius: Float = 22) -> CGImage? {
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         guard let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
@@ -33,7 +37,7 @@ enum ArtworkProcessor {
         let input = CIImage(cgImage: small)
         let blur = CIFilter.gaussianBlur()
         blur.inputImage = input.clampedToExtent()
-        blur.radius = 22
+        blur.radius = blurRadius
         guard let blurred = blur.outputImage?.cropped(to: input.extent) else { return nil }
         let controls = CIFilter.colorControls()
         controls.inputImage = blurred

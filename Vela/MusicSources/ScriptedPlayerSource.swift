@@ -160,7 +160,7 @@ final class AppleMusicSource: ScriptedPlayerSource, @unchecked Sendable {
             try
                 set t to current track
                 set pos to player position
-                return playerState & sep & pos & sep & (persistent ID of t) & sep & (name of t) & sep & (artist of t) & sep & (album of t) & sep & (duration of t)
+                return playerState & sep & pos & sep & (persistent ID of t) & sep & (name of t) & sep & (artist of t) & sep & (album of t) & sep & (duration of t) & sep & (genre of t)
             on error
                 return playerState & sep & "0"
             end try
@@ -174,8 +174,10 @@ final class AppleMusicSource: ScriptedPlayerSource, @unchecked Sendable {
         guard fields.count >= 7, state != .stopped else {
             return PlaybackSnapshot(track: nil, state: state, position: position, observedAt: observedAt)
         }
+        let genre = fields.count > 7 ? fields[7].trimmingCharacters(in: .whitespaces) : ""
         let track = TrackInfo(id: fields[2], title: fields[3], artist: fields[4], album: fields[5],
-                              duration: Self.number(fields[6]), source: .appleMusic, artworkURL: nil)
+                              duration: Self.number(fields[6]), source: .appleMusic, artworkURL: nil,
+                              genre: genre.isEmpty ? nil : genre)
         return PlaybackSnapshot(track: track, state: state, position: position, observedAt: observedAt)
     }
 

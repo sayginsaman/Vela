@@ -3,8 +3,8 @@ import Observation
 import CoreGraphics
 import os
 
-/// Owns whichever producer feeds `AudioLevelStore`: ScreenCaptureKit for real playback, the
-/// deterministic simulator in Demo Mode, or nothing (the renderers then "breathe").
+/// Owns whichever producer feeds `FeatureStore`: ScreenCaptureKit for real playback, the
+/// deterministic fixture producer in Demo Mode, or nothing (the renderers then "breathe").
 @MainActor
 @Observable
 final class AudioEngine {
@@ -12,18 +12,18 @@ final class AudioEngine {
 
     private(set) var mode: Mode = .off
     private(set) var status: AudioCaptureStatus = .idle
-    let store = AudioLevelStore()
+    let store = FeatureStore()
 
     @ObservationIgnored private var capture: SystemAudioCapture?
     @ObservationIgnored private var demoTask: Task<Void, Never>?
     @ObservationIgnored private let clockBox = ClockBox()
     @ObservationIgnored private var startingTask: Task<Void, Never>?
 
-    /// Shared with the demo simulator so it can follow seeks and pauses without hopping actors.
+    /// Shared with the demo producer so it follows seeks, pauses and fixture changes.
     final class ClockBox: @unchecked Sendable {
-        private let lock = OSAllocatedUnfairLock(initialState: (clock: PlaybackClock(), bpm: 100.0))
-        func update(clock: PlaybackClock, bpm: Double) { lock.withLock { $0 = (clock, bpm) } }
-        func read() -> (clock: PlaybackClock, bpm: Double) { lock.withLock { $0 } }
+        private let lock = OSAllocatedUnfairLock(initialState: (clock: PlaybackClock(), fixture: ProfileFixture(profile: .pop)))
+        func update(clock: PlaybackClock, fixture: ProfileFixture) { lock.withLock { $0 = (clock, fixture) } }
+        func read() -> (clock: PlaybackClock, fixture: ProfileFixture) { lock.withLock { $0 } }
     }
 
     var hasPermission: Bool { SystemAudioCapture.hasPermission }
@@ -45,8 +45,13 @@ final class AudioEngine {
         return granted
     }
 
-    func updateClock(_ clock: PlaybackClock, bpm: Double) {
-        clockBox.update(clock: clock, bpm: bpm)
+    func updateClock(_ clock: PlaybackClock, fixture: ProfileFixture) {
+        clockBox.update(clock: clock, fixture: fixture)
+    }
+
+    /// Forgets rhythm history on both producers (track change).
+    func resetAnalysis() {
+        store.requestReset()
     }
 
     func setMode(_ newMode: Mode) {
@@ -86,12 +91,17 @@ final class AudioEngine {
         let box = clockBox
         let store = store
         demoTask = Task.detached(priority: .utility) {
+            var producer = DemoFeatureProducer(fixture: box.read().fixture)
+            var generation = store.resetGeneration
+            let interval = 1.0 / FeatureExtractor.gridRate
             while !Task.isCancelled {
-                let (clock, bpm) = box.read()
+                let (clock, fixture) = box.read()
+                producer.setFixture(fixture)
+                let current = store.resetGeneration
+                if current != generation { generation = current; producer.reset() }
                 let now = Date()
-                let bands = DemoAudioSimulator(bpm: bpm).bands(at: clock.position(at: now), playing: clock.isRunning)
-                store.publish(bands)
-                try? await Task.sleep(for: .milliseconds(33))
+                store.publish(producer.produce(position: clock.position(at: now), playing: clock.isRunning))
+                try? await Task.sleep(for: .milliseconds(Int(interval * 1000)))
             }
         }
     }

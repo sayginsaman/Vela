@@ -9,8 +9,11 @@ struct SceneView: View {
         GeometryReader { proxy in
             let typography = typography(for: proxy.size)
             ZStack {
-                BackdropView(backdrop: model.backdrop, palette: model.palette,
-                             reduceEffects: model.settings.reduceEffects, reduceMotion: reduceMotion)
+                ReactiveSceneView(director: model.director, features: model.audio.store,
+                                  artworkSoft: model.backdrop, artworkSharp: model.backdropSharp,
+                                  artworkGeneration: model.artworkGeneration,
+                                  geometry: model.sceneGeometry)
+                    .ignoresSafeArea()
                 if model.increaseContrast {
                     Color.black.opacity(0.28).ignoresSafeArea()
                 }
@@ -20,9 +23,6 @@ struct SceneView: View {
                     .id(model.transitionID)
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.7), value: model.transitionID)
-
-                EdgeGlowView(parameters: model.glowParameters(reduceMotion: reduceMotion), audio: model.audio.store)
-                    .ignoresSafeArea()
 
                 overlays
             }
@@ -51,7 +51,7 @@ struct SceneView: View {
         let palette = model.palette
         switch model.stage {
         case .lyrics(let box):
-            LyricsStageView(box: box, typography: typography, clock: model.clock, offset: model.settings.lyricsOffset)
+            LyricsStageView(box: box, typography: typography, clock: model.clock, offset: model.settings.lyricsOffset, director: model.director)
                 .padding(.vertical, 60)
         case .unsynced(let box):
             UnsyncedLyricsView(box: box, typography: typography, clock: model.clock)
@@ -181,6 +181,11 @@ private struct SourceBadge: View {
                 Text("·").foregroundStyle(.white.opacity(0.4))
                 Text(quality).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.6))
             }
+            if model.track != nil || model.previewProfile != nil {
+                Text("·").foregroundStyle(.white.opacity(0.4))
+                Text(model.previewProfile.map { "Preview: \($0.displayName)" } ?? model.effectiveProfile.displayName)
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.6))
+            }
             if model.audio.status == .denied || model.audio.status == .notDetermined, !model.isDemoMode, model.track != nil {
                 Text("·").foregroundStyle(.white.opacity(0.4))
                 Text("No system audio").font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.6))
@@ -188,7 +193,7 @@ private struct SourceBadge: View {
         }
         .foregroundStyle(.white.opacity(0.85))
         .padding(.horizontal, 12).padding(.vertical, 7)
-        .background(Capsule().fill(Color.black.opacity(0.35)))
+        .background(Capsule().fill(Color.black.opacity(model.reduceTransparency ? 0.85 : 0.35)))
         .overlay(Capsule().strokeBorder(Color.white.opacity(0.1)))
         .accessibilityElement(children: .combine)
     }

@@ -27,13 +27,19 @@ final class LyricsServiceTests: XCTestCase {
 
     func testDemoTracksUseBundledLyrics() async {
         let service = makeService(remote: [StubProvider(name: "never", error: LyricsProviderError.network("no"))])
-        let outcome = await service.resolve(track: DemoCatalog.tracks[0].trackInfo)
+        let wordSynced = DemoCatalog.track(withID: "demo-concrete-halo")!
+        let outcome = await service.resolve(track: wordSynced.trackInfo)
         guard case .found(let doc) = outcome else { return XCTFail("expected demo lyrics, got \(outcome)") }
         XCTAssertEqual(doc.quality, .wordSynced)
         XCTAssertEqual(doc.provenance, "demo")
 
-        let instrumental = await service.resolve(track: DemoCatalog.tracks[3].trackInfo)
+        let instrumental = await service.resolve(track: DemoCatalog.track(withID: "demo-glasswater")!.trackInfo)
         XCTAssertEqual(instrumental, .instrumental)
+
+        // Every demo track with lyrics resolves offline.
+        for track in DemoCatalog.tracks where !track.isInstrumental {
+            guard case .found = await service.resolve(track: track.trackInfo) else { return XCTFail("missing lyrics for \(track.title)") }
+        }
     }
 
     func testRemoteFailureNeverThrowsAndReportsFailure() async {

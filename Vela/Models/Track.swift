@@ -37,6 +37,8 @@ struct TrackInfo: Hashable, Codable, Sendable {
     var source: MusicSourceKind
     /// Remote artwork location, when the player only offers a URL.
     var artworkURL: URL?
+    /// Genre string as reported by the player, when it exposes one (Apple Music does; Spotify does not).
+    var genre: String? = nil
 
     /// Key used to decide whether two snapshots describe the same song.
     var identityKey: String { "\(source.rawValue):\(id)" }

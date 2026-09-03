@@ -32,7 +32,13 @@ struct LyricLineView: View {
         FlowLayout(spacing: typography.fontSize * 0.24, lineSpacing: typography.fontSize * 0.1) {
             ForEach(words) { word in
                 let index = line.words.firstIndex(where: { $0.id == word.id }) ?? 0
-                LyricWordView(text: word.text, state: state(for: index), typography: typography, isCurrentLine: role == .current)
+                let wordState = state(for: index)
+                // Only the word being sung receives per-frame beat values.
+                let wordTypography: LyricTypography = {
+                    if case .active = wordState { return typography }
+                    return typography.still
+                }()
+                LyricWordView(text: word.text, state: wordState, typography: wordTypography, isCurrentLine: role == .current)
             }
         }
         .environment(\.layoutDirection, .leftToRight)

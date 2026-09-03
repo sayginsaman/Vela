@@ -72,6 +72,48 @@ struct VelaSettings: Codable, Equatable, Sendable {
     var launchAtLogin: Bool = false
     var onboardingComplete: Bool = false
 
+    // Visual profile
+    var visualProfile: VisualProfileSelection = .auto
+    var reactiveIntensity: Double = 1.0      // 0...1.5
+    var backgroundReaction: Double = 1.0     // 0...1.5
+    var edgeReaction: Double = 1.0           // 0...1.5
+    var lyricMotionIntensity: Double = 1.0   // 0...1.5
+    var particlesEnabled: Bool = true
+    var reduceIntenseMotion: Bool = false
+
+    static let reactionRange: ClosedRange<Double> = 0...1.5
+
+    init() {}
+
+    /// Missing keys fall back to defaults so settings written by older versions keep loading.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let base = VelaSettings()
+        paletteMode = try c.decodeIfPresent(PaletteMode.self, forKey: .paletteMode) ?? base.paletteMode
+        manualHighlight = try c.decodeIfPresent(RGBColor.self, forKey: .manualHighlight) ?? base.manualHighlight
+        manualGlow = try c.decodeIfPresent(RGBColor.self, forKey: .manualGlow) ?? base.manualGlow
+        manualBackground = try c.decodeIfPresent(RGBColor.self, forKey: .manualBackground) ?? base.manualBackground
+        lyricSize = try c.decodeIfPresent(Double.self, forKey: .lyricSize) ?? base.lyricSize
+        lyricStyle = try c.decodeIfPresent(LyricStyle.self, forKey: .lyricStyle) ?? base.lyricStyle
+        glowThickness = try c.decodeIfPresent(Double.self, forKey: .glowThickness) ?? base.glowThickness
+        glowIntensity = try c.decodeIfPresent(Double.self, forKey: .glowIntensity) ?? base.glowIntensity
+        glowSpread = try c.decodeIfPresent(Double.self, forKey: .glowSpread) ?? base.glowSpread
+        reactiveMotion = try c.decodeIfPresent(Bool.self, forKey: .reactiveMotion) ?? base.reactiveMotion
+        reduceEffects = try c.decodeIfPresent(Bool.self, forKey: .reduceEffects) ?? base.reduceEffects
+        lyricsOffset = try c.decodeIfPresent(Double.self, forKey: .lyricsOffset) ?? base.lyricsOffset
+        preferredSource = try c.decodeIfPresent(PreferredSource.self, forKey: .preferredSource) ?? base.preferredSource
+        selectedDisplayID = try c.decodeIfPresent(String.self, forKey: .selectedDisplayID)
+        launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? base.launchAtLogin
+        onboardingComplete = try c.decodeIfPresent(Bool.self, forKey: .onboardingComplete) ?? base.onboardingComplete
+        visualProfile = try c.decodeIfPresent(VisualProfileSelection.self, forKey: .visualProfile) ?? base.visualProfile
+        reactiveIntensity = try c.decodeIfPresent(Double.self, forKey: .reactiveIntensity) ?? base.reactiveIntensity
+        backgroundReaction = try c.decodeIfPresent(Double.self, forKey: .backgroundReaction) ?? base.backgroundReaction
+        edgeReaction = try c.decodeIfPresent(Double.self, forKey: .edgeReaction) ?? base.edgeReaction
+        lyricMotionIntensity = try c.decodeIfPresent(Double.self, forKey: .lyricMotionIntensity) ?? base.lyricMotionIntensity
+        particlesEnabled = try c.decodeIfPresent(Bool.self, forKey: .particlesEnabled) ?? base.particlesEnabled
+        reduceIntenseMotion = try c.decodeIfPresent(Bool.self, forKey: .reduceIntenseMotion) ?? base.reduceIntenseMotion
+    }
+
     static let lyricSizeRange: ClosedRange<Double> = 0.7...1.6
     static let glowThicknessRange: ClosedRange<Double> = 0.3...2.0
     static let glowIntensityRange: ClosedRange<Double> = 0...1.5
@@ -86,6 +128,10 @@ struct VelaSettings: Codable, Equatable, Sendable {
         copy.glowIntensity = min(max(glowIntensity, Self.glowIntensityRange.lowerBound), Self.glowIntensityRange.upperBound)
         copy.glowSpread = min(max(glowSpread, Self.glowSpreadRange.lowerBound), Self.glowSpreadRange.upperBound)
         copy.lyricsOffset = min(max(lyricsOffset, Self.offsetRange.lowerBound), Self.offsetRange.upperBound)
+        copy.reactiveIntensity = min(max(reactiveIntensity, Self.reactionRange.lowerBound), Self.reactionRange.upperBound)
+        copy.backgroundReaction = min(max(backgroundReaction, Self.reactionRange.lowerBound), Self.reactionRange.upperBound)
+        copy.edgeReaction = min(max(edgeReaction, Self.reactionRange.lowerBound), Self.reactionRange.upperBound)
+        copy.lyricMotionIntensity = min(max(lyricMotionIntensity, Self.reactionRange.lowerBound), Self.reactionRange.upperBound)
         return copy
     }
 }

@@ -17,15 +17,19 @@ enum AudioCaptureStatus: Equatable, Sendable {
 /// A tiny 2×2 video stream is configured because ScreenCaptureKit requires a display filter;
 /// its frames are discarded. All sample handling happens on a private queue.
 final class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
-    let store: AudioLevelStore
+    let store: FeatureStore
     private let queue = DispatchQueue(label: "app.vela.audio", qos: .userInteractive)
     private var stream: SCStream?
     private var analyzer = SpectrumAnalyzer()
+    private var extractor = FeatureExtractor()
     private var ring: [Float] = []
+    private var samplesProcessed = 0
+    private var appliedResetGeneration = 0
     private var stopHandler: (@Sendable (String) -> Void)?
 
-    init(store: AudioLevelStore) {
+    init(store: FeatureStore) {
         self.store = store
+        self.appliedResetGeneration = store.resetGeneration
         super.init()
     }
 
@@ -108,13 +112,25 @@ final class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate, @unc
     private func drainRing() {
         let size = analyzer.frameCount
         guard ring.count >= size else { return }
-        // Keep the analyser on the freshest block; drop backlog to avoid latency build-up.
-        if ring.count > size * 3 { ring.removeFirst(ring.count - size * 2) }
-        let bands = ring.withUnsafeBufferPointer { ptr in
-            analyzer.analyze(UnsafeBufferPointer(rebasing: ptr[(ring.count - size)...]))
+        let generation = store.resetGeneration
+        if generation != appliedResetGeneration {
+            appliedResetGeneration = generation
+            extractor.reset()
         }
-        ring.removeFirst(min(ring.count, size / 2))
-        store.publish(bands)
+        // Keep the analyser on the freshest block; drop backlog to avoid latency build-up.
+        if ring.count > size * 3 {
+            let dropped = ring.count - size * 2
+            ring.removeFirst(dropped)
+            samplesProcessed += dropped
+        }
+        let hop = size / 2
+        let time = Double(samplesProcessed + ring.count - size) / analyzer.sampleRate
+        let frame = ring.withUnsafeBufferPointer { ptr in
+            analyzer.analyze(UnsafeBufferPointer(rebasing: ptr[(ring.count - size)...]), time: time)
+        }
+        ring.removeFirst(min(ring.count, hop))
+        samplesProcessed += hop
+        store.publish(extractor.ingest(frame))
     }
 
     // MARK: SCStreamDelegate

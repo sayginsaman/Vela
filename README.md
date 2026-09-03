@@ -51,6 +51,23 @@ Metal shader toolchain does not need to be installed to build the project.
 
 The controls bar hides after about three seconds of inactivity while music is playing.
 
+### Visual profiles
+
+Different music gets a different visual personality. Settings › Visual profile offers **Auto**
+(default) and six lockable profiles: Rap / Trap, Rock / Metal, Electronic / Dance, Pop,
+R&B / Ambient and Acoustic / Classical. A manual choice always wins until you return to Auto, and
+the choice persists across launches. Four sliders scale reactivity overall, the background, the
+edge light and lyric motion; particles and "reduce intense motion" are toggles. "Preview profile"
+plays a ten-second deterministic simulation of any profile over the current scene without
+touching playback, and the Analysis disclosure shows what the detector currently measures.
+
+Auto is hybrid. When the player exposes a genre (Apple Music does, Spotify's scripting interface
+does not) the genre string is normalised onto a profile immediately. Otherwise the system-audio
+features drive a deterministic heuristic (see Architecture). Detection waits for an initial
+window, locks once confident, keeps the profile for the track, and only re-evaluates when the
+initial confidence was low or the music changes substantially and persistently. Profiles
+crossfade rather than switch; Pop is the neutral fallback.
+
 Three lyric styles are available in Settings: **Focus** (default; centred line, precise word
 highlighting), **Drift** (neighbouring lines recede through depth) and **Bloom** (words swell and
 glow as they are sung). Settings also cover palette (automatic from artwork or manual), lyric size,
@@ -90,19 +107,42 @@ Everything lives in one app target, grouped by responsibility:
   seeking), `LRCLIBProvider`, `LyricsCache` (disk, keyed by a normalised hash of artist/title/
   album/duration), `LocalLyricsStore` (imported `.lrc` files) and `LyricsService` (the resolver).
 - `Palette/` — `PaletteExtractor` (histogram over a 32×32 sample), `PaletteCorrector` (contrast,
-  similarity and muddiness rules), `ArtworkProcessor` (pre-blurred backdrop via Core Image).
-- `Audio/` — `SystemAudioCapture` (ScreenCaptureKit), `SpectrumAnalyzer` (vDSP FFT, band
-  energies, auto-gain, attack/release smoothing), `DemoAudioSimulator`, `AudioLevelStore`
-  (lock-protected mailbox between the audio thread and the render thread) and `AudioEngine`.
-- `Rendering/` — `EdgeGlowRenderer` (Metal, one full-screen triangle with an SDF fragment shader,
-  transparent over the SwiftUI scene, paused when occluded), a `Canvas` fallback, and the
-  artwork backdrop with drifting gradient and grain.
+  similarity and muddiness rules), `ArtworkProcessor` (soft and sharp pre-blurred backdrops).
+- `Audio/` — `SystemAudioCapture` (ScreenCaptureKit), `SpectrumAnalyzer` (vDSP FFT → raw band
+  energies, RMS, spectral centroid and flux per block), `FeatureExtractor` (normalisation,
+  per-band transients, onset detection, autocorrelation tempo estimate with beat-phase tracking,
+  onset density, transient strength, dynamic range, loudness, regularity), `ProfileFixtures`
+  (deterministic per-profile "music" for Demo Mode and previews, run through the same
+  extractor), and `FeatureStore` (lock-protected mailbox to the render thread).
+- `Visual/` — `VisualProfile` / `VisualProfilePreset` (declarative per-profile parameters with
+  interpolation, Reduce Motion and intensity transforms), `GenreNormalizer`,
+  `ProfileClassifier` (weighted range-membership scoring), `ProfileDetector` (windowing,
+  locking, hysteresis), `PaletteStyler` (profile colour treatment with readability re-enforced)
+  and `VisualDirector`, which fuses profile, features, palette, accessibility and user
+  intensities into one attack/release-smoothed `ReactiveVisualState` per frame.
+- `Rendering/` — `SceneRenderer` (Metal: artwork backdrop with bass expansion and restrained
+  warp, six palette control points that orbit/flow/compress, beat rings, hi-hat slices, drum
+  streaks, vignette, grain, the SDF edge light with travelling head, plus an instanced particle
+  pass capped at 160 sprites; paused when occluded or minimised) and a SwiftUI `Canvas`
+  fallback for machines without Metal.
 - `Scene/` — the SwiftUI stage: `LyricsStageView` samples the playback clock each frame,
   `LyricLineStack` positions lines with spring motion, `LyricLineView`/`LyricWordView` render
   words with progressive fill and bloom, plus overlays, onboarding, settings and status states.
 - `Settings/` — typed `VelaSettings` persisted by `SettingsStore`.
 - `Window/WindowController.swift` — AppKit bridge for fullscreen, display selection and notch
   geometry.
+
+### Profile classification heuristic
+
+`ProfileClassifier` scores each profile as the weighted mean of range memberships over eleven
+features (BPM with octave alternatives, BPM confidence, bass-to-mid ratio, high energy, spectral
+centroid, spectral flux, onset density, transient strength, dynamic range, loudness, rhythmic
+regularity). A feature scores 1 inside the profile's range and falls off linearly outside it.
+Confidence is the best score weighted by its margin over the runner-up. `ProfileDetector` smooths
+the score vector with an exponential average, waits for eight seconds and twelve samples, locks
+when confidence is at least 0.5 (otherwise Pop), re-evaluates every twenty seconds only if the
+initial confidence was below 0.72, and otherwise switches only after a ten-second, very
+confident contradiction. Genre metadata short-circuits all of this.
 
 Timing is honest end to end: a `LyricDocument` carries a `TimingQuality` (word-synced,
 line-synced, estimated, unsynced) and every `TimedWord` records whether its timestamps were
@@ -125,10 +165,14 @@ scrolling unsynced mode.
 ## Demo Mode
 
 Demo Mode (⌘⇧D, or "Try Demo" at the end of onboarding) needs no players, permissions or
-network. `DemoMusicSource` simulates a four-track album with a real-time timeline, seeking,
-skipping and pausing. Artwork is drawn procedurally per track, lyrics are original texts bundled
-as `.lrc`/`.txt` files (one word-synced, one line-synced, one plain, one instrumental), and
-`DemoAudioSimulator` produces deterministic bass/mid/high/level bands from the track's tempo so the
-edge light reacts exactly as it would to captured audio.
+network. `DemoMusicSource` simulates an eight-track catalogue with a real-time timeline, seeking,
+skipping and pausing. Artwork is drawn procedurally per track and lyrics are original texts
+bundled as `.lrc`/`.txt` files. Six tracks are audio fixtures, one per visual profile (Concrete
+Halo → Rap / Trap, Wirecutter → Rock / Metal, Signal Bloom → Electronic / Dance, Paper Lanterns →
+Pop, Low Tide Signal → R&B / Ambient, Kitchen Light → Acoustic / Classical); the remaining two
+show the unsynced and instrumental states. Fixtures generate deterministic kick/snare/hat
+patterns, section dynamics and spectral character that run through the real `FeatureExtractor`,
+so Auto detection, the diagnostics and the reactive background behave exactly as with captured
+audio. Settings › Demo Mode picks a track directly; ⌘⇧N cycles the fixtures.
 
 All demo lyrics and artwork were created for this project.

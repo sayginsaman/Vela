@@ -1,7 +1,8 @@
 import Foundation
 import Accelerate
 
-/// Turns mono PCM blocks into smoothed, auto-gain-controlled band levels using vDSP.
+/// Turns mono PCM blocks into raw per-frame descriptors (band energies, RMS, spectral centroid
+/// and flux) using vDSP. Normalisation and smoothing happen downstream in `FeatureExtractor`.
 ///
 /// Not thread-safe by itself; the owner calls it from a single audio queue.
 struct SpectrumAnalyzer {
@@ -13,10 +14,9 @@ struct SpectrumAnalyzer {
     private var real: [Float]
     private var imag: [Float]
     private var magnitudes: [Float]
-
-    // Smoothing / AGC state
-    private var smoothed = AudioBands.silent
-    private var ceilings: (bass: Float, mid: Float, high: Float, level: Float) = (0.02, 0.02, 0.02, 0.02)
+    private var previousMagnitudes: [Float]
+    private var windowed: [Float]
+    private var logPositions: [Float]
 
     static let bassRange: ClosedRange<Double> = 30...160
     static let midRange: ClosedRange<Double> = 160...2200
@@ -29,18 +29,25 @@ struct SpectrumAnalyzer {
         setup = vDSP_create_fftsetup(log2n, FFTRadix(kFFTRadix2))!
         window = [Float](repeating: 0, count: frameCount)
         vDSP_hann_window(&window, vDSP_Length(frameCount), Int32(vDSP_HANN_NORM))
-        real = [Float](repeating: 0, count: frameCount / 2)
-        imag = [Float](repeating: 0, count: frameCount / 2)
-        magnitudes = [Float](repeating: 0, count: frameCount / 2)
+        let half = frameCount / 2
+        real = [Float](repeating: 0, count: half)
+        imag = [Float](repeating: 0, count: half)
+        magnitudes = [Float](repeating: 0, count: half)
+        previousMagnitudes = [Float](repeating: 0, count: half)
+        windowed = [Float](repeating: 0, count: frameCount)
+        // Log-frequency position of every bin, 0 at 40 Hz … 1 at 12 kHz, for the centroid.
+        let binWidth = sampleRate / Double(frameCount)
+        logPositions = (0..<half).map { bin in
+            let hz = max(1, Double(bin) * binWidth)
+            return Float(min(1, max(0, (log2(hz / 40) / log2(12000 / 40)))))
+        }
     }
 
-    /// Analyses one block of `frameCount` mono samples. Returns smoothed bands.
-    mutating func analyze(_ samples: UnsafeBufferPointer<Float>) -> AudioBands {
+    /// Analyses one block of `frameCount` mono samples.
+    mutating func analyze(_ samples: UnsafeBufferPointer<Float>, time: TimeInterval) -> FrameDescriptor {
         precondition(samples.count >= frameCount)
-        var windowed = [Float](repeating: 0, count: frameCount)
         vDSP_vmul(samples.baseAddress!, 1, window, 1, &windowed, 1, vDSP_Length(frameCount))
 
-        // RMS loudness straight from the time domain.
         var rms: Float = 0
         vDSP_rmsqv(samples.baseAddress!, 1, &rms, vDSP_Length(frameCount))
 
@@ -59,15 +66,29 @@ struct SpectrumAnalyzer {
                 }
             }
         }
-        // Normalise the FFT scaling (vDSP packs a 2x factor into the real FFT).
         var scale = 1 / Float(frameCount * frameCount)
         vDSP_vsmul(magnitudes, 1, &scale, &magnitudes, 1, vDSP_Length(half))
 
         let bass = energy(in: Self.bassRange)
         let mid = energy(in: Self.midRange)
         let high = energy(in: Self.highRange)
-        let raw = AudioBands(bass: bass, mid: mid, high: high, level: rms)
-        return smooth(raw)
+
+        // Spectral centroid (log-frequency weighted) and positive flux, from bin 1 upward.
+        var weightedSum: Float = 0
+        var magnitudeSum: Float = 0
+        var flux: Float = 0
+        for bin in 1..<half {
+            let m = sqrt(magnitudes[bin])
+            weightedSum += m * logPositions[bin]
+            magnitudeSum += m
+            let delta = m - previousMagnitudes[bin]
+            if delta > 0 { flux += delta }
+            previousMagnitudes[bin] = m
+        }
+        let centroid = magnitudeSum > 1e-7 ? weightedSum / magnitudeSum : 0.5
+        let normalisedFlux = magnitudeSum > 1e-7 ? flux / magnitudeSum : 0
+
+        return FrameDescriptor(time: time, bass: bass, mid: mid, high: high, level: rms, centroid: centroid, flux: normalisedFlux)
     }
 
     private func energy(in range: ClosedRange<Double>) -> Float {
@@ -79,34 +100,6 @@ struct SpectrumAnalyzer {
         magnitudes.withUnsafeBufferPointer { ptr in
             vDSP_sve(ptr.baseAddress! + low, 1, &sum, vDSP_Length(high - low + 1))
         }
-        // Convert power to something closer to perceived loudness.
         return sqrt(sum / Float(high - low + 1))
-    }
-
-    /// Adaptive gain + attack/release smoothing.
-    private mutating func smooth(_ raw: AudioBands) -> AudioBands {
-        func normalise(_ value: Float, ceiling: inout Float) -> Float {
-            // Ceiling follows peaks quickly and decays slowly (roughly 4 s at 45 blocks/s).
-            if value > ceiling { ceiling = ceiling + (value - ceiling) * 0.3 }
-            else { ceiling = max(0.0005, ceiling * 0.995) }
-            let normalised = min(1, value / max(ceiling, 0.0005))
-            // Soft curve so quiet passages still show something without exaggerating peaks.
-            return pow(normalised, 0.8)
-        }
-        let bass = normalise(raw.bass, ceiling: &ceilings.bass)
-        let mid = normalise(raw.mid, ceiling: &ceilings.mid)
-        let high = normalise(raw.high, ceiling: &ceilings.high)
-        let level = normalise(raw.level, ceiling: &ceilings.level)
-        let target = AudioBands(bass: bass, mid: mid, high: high, level: level)
-
-        func follow(_ current: Float, _ goal: Float) -> Float {
-            let coefficient: Float = goal > current ? 0.45 : 0.12
-            return current + (goal - current) * coefficient
-        }
-        smoothed = AudioBands(bass: follow(smoothed.bass, target.bass),
-                              mid: follow(smoothed.mid, target.mid),
-                              high: follow(smoothed.high, target.high),
-                              level: follow(smoothed.level, target.level))
-        return smoothed
     }
 }
