@@ -11,9 +11,12 @@ final class SettingsStore {
         didSet {
             let normalized = settings.normalized()
             if normalized != settings { settings = normalized; return }
-            if settings != oldValue { persist() }
+            if settings != oldValue, isPersistenceEnabled { persist() }
         }
     }
+
+    /// Off during scripted screenshot runs so capture-time tweaks never reach disk.
+    @ObservationIgnored var isPersistenceEnabled = true
 
     private let defaults: UserDefaults
 

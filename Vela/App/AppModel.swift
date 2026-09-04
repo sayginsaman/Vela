@@ -105,6 +105,9 @@ final class AppModel {
     @ObservationIgnored private var detectionTask: Task<Void, Never>?
     @ObservationIgnored private var trackGeneration = 0
     @ObservationIgnored private var reduceMotion = false
+    /// `VELA_PROFILE=<auto|rapTrap|…>` overrides the saved selection for this run only (captures).
+    @ObservationIgnored private let profileOverride: VisualProfileSelection? =
+        ProcessInfo.processInfo.environment["VELA_PROFILE"].flatMap(VisualProfileSelection.init(rawValue:))
 
     // MARK: Playback state
     private(set) var playback: PlaybackSnapshot = .empty
@@ -205,7 +208,7 @@ final class AppModel {
 
     /// The profile in force: a manual lock, otherwise Auto's detection (Pop until settled).
     var effectiveProfile: VisualProfile {
-        ProfileResolver.resolve(selection: settings.visualProfile, detection: detection)
+        ProfileResolver.resolve(selection: profileOverride ?? settings.visualProfile, detection: detection)
     }
 
     /// Demo audio fixture for the current track (defaults to Pop for real players).
@@ -262,9 +265,23 @@ final class AppModel {
         pushVisualInputs()
         startDetectionLoop()
         if isDemoMode { Task { await demoSource.setEnabled(true) } }
-        // Developer hook: `VELA_DEMO_TRACK=<catalogue id>` starts straight into that demo fixture.
-        if let requested = ProcessInfo.processInfo.environment["VELA_DEMO_TRACK"], DemoCatalog.track(withID: requested) != nil {
+        // Developer hooks: `VELA_DEMO_TRACK=<catalogue id>` starts straight into that demo fixture;
+        // `VELA_SCREENSHOT_SETTINGS=1` / `VELA_SCREENSHOT_ONBOARDING=1` show those layers for captures.
+        let env = ProcessInfo.processInfo.environment
+        if let requested = env["VELA_DEMO_TRACK"], DemoCatalog.track(withID: requested) != nil {
             selectDemoTrack(id: requested)
+        }
+        if env["VELA_SCREENSHOT_PATH"] != nil {
+            settingsStore.isPersistenceEnabled = false
+            if let profileOverride { settings.visualProfile = profileOverride }
+            showOnboarding = env["VELA_SCREENSHOT_ONBOARDING"] == "1"
+            if env["VELA_SCREENSHOT_SETTINGS"] == "1" {
+                let delay = max(0.5, (Double(env["VELA_SCREENSHOT_DELAY"] ?? "") ?? 20) - 1.5)
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(delay))
+                    self?.settingsVisible = true
+                }
+            }
         }
         eventTask = Task { [weak self] in
             guard let coordinator = self?.coordinator else { return }

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ImageIO
 
 /// Bridges the SwiftUI window to AppKit for fullscreen, display selection and notch geometry.
 @MainActor
@@ -32,9 +33,50 @@ final class WindowController: NSObject {
             },
         ]
         onFullscreenChange?(isFullscreen)
+        installScreenshotHook(window)
     }
 
     var isFullscreen: Bool { window?.styleMask.contains(.fullScreen) ?? false }
+
+    // MARK: Developer screenshot hook
+
+    /// `VELA_SCREENSHOT_PATH=/path.png` captures the window to disk after `VELA_SCREENSHOT_DELAY`
+    /// seconds (default 20) using the app's own window image, which needs no screen-recording
+    /// permission. `VELA_WINDOW_SIZE=1600x900` sizes the window first; `VELA_SCREENSHOT_QUIT=1`
+    /// quits afterwards. Used to produce the README images.
+    private func installScreenshotHook(_ window: NSWindow) {
+        let env = ProcessInfo.processInfo.environment
+        guard let path = env["VELA_SCREENSHOT_PATH"], !path.isEmpty else { return }
+        if let size = env["VELA_WINDOW_SIZE"] {
+            let parts = size.split(separator: "x").compactMap { Double($0) }
+            if parts.count == 2 {
+                window.setContentSize(NSSize(width: parts[0], height: parts[1]))
+                window.center()
+            }
+        }
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            window.standardWindowButton(kind)?.isHidden = true
+        }
+        let delay = Double(env["VELA_SCREENSHOT_DELAY"] ?? "") ?? 20
+        let quit = env["VELA_SCREENSHOT_QUIT"] == "1"
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak window] in
+            guard let window else { return }
+            Self.capture(window, to: URL(fileURLWithPath: path))
+            if quit { NSApp.terminate(nil) }
+        }
+    }
+
+    private static func capture(_ window: NSWindow, to url: URL) {
+        let id = CGWindowID(window.windowNumber)
+        guard let image = CGWindowListCreateImage(.null, .optionIncludingWindow, id, [.boundsIgnoreFraming, .bestResolution]),
+              let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else {
+            VelaLog.app.error("screenshot capture failed")
+            return
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationFinalize(destination)
+        VelaLog.app.info("screenshot written to \(url.path, privacy: .public)")
+    }
 
     func toggleFullscreen(displayID: String?) {
         guard let window else { return }

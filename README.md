@@ -3,9 +3,68 @@
 Vela is a native macOS app that turns whatever is playing in Spotify or Apple Music into a
 full-screen stage: synchronized lyrics highlighted word by word, colours pulled from the album
 artwork, and an ambient light around all four edges of the display that follows the music.
+Every song gets a visual personality of its own: rap hits hard and dark, electronic pulses in
+neon, ambient drifts like liquid, acoustic stays hushed and spacious.
 
 It is a normal foreground application, not a screensaver or lock-screen tweak. Open the window,
 press ⌘F, and let it run.
+
+<p align="center">
+  <img src="docs/screenshots/rap-trap.png" alt="Vela showing word-synced lyrics with a Rap / Trap visual profile" width="900">
+</p>
+
+## Download
+
+Grab the latest disk image from the [Releases](../../releases) page, open it and drag Vela to
+Applications. The build is signed for local use only (no Apple Developer ID yet), so the first
+launch needs a right-click › Open, or:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Vela.app
+```
+
+## Six visual profiles
+
+Vela listens to the music and picks a profile automatically, or you lock one in Settings.
+Every profile keeps the album artwork as its colour source and bends it: contrast, warmth,
+bloom, motion, particles and the way lyrics move all change.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/rap-trap.png" width="440" alt="Rap / Trap"><br><b>Rap / Trap</b><br><sub>bass-driven punches, dark backdrop, focused accents</sub></td>
+    <td align="center"><img src="docs/screenshots/rock-metal.png" width="440" alt="Rock / Metal"><br><b>Rock / Metal</b><br><sub>warm, high-contrast, drum-hit streaks</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/electronic-dance.png" width="440" alt="Electronic / Dance"><br><b>Electronic / Dance</b><br><sub>beat-locked pulses, orbiting colour, travelling edge light</sub></td>
+    <td align="center"><img src="docs/screenshots/pop.png" width="440" alt="Pop"><br><b>Pop</b><br><sub>glossy blooms, balanced motion</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/rnb-ambient.png" width="440" alt="R&B / Ambient"><br><b>R&amp;B / Ambient</b><br><sub>liquid gradients, slow waves, floating lyrics</sub></td>
+    <td align="center"><img src="docs/screenshots/acoustic-classical.png" width="440" alt="Acoustic / Classical"><br><b>Acoustic / Classical</b><br><sub>soft luminance, minimal light, phrase-driven motion</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/settings.png" width="440" alt="Settings overlay with the Visual Profile section">
+  <img src="docs/screenshots/onboarding.png" width="440" alt="Onboarding">
+</p>
+
+## Highlights
+
+- **Word-by-word lyrics** from LRCLIB, imported `.lrc` files or the bundled demo songs, with
+  honest timing: word-synced, line-synced (words estimated) or plain.
+- **Album-art palette** extracted per track and corrected for readability, then styled by the
+  active profile.
+- **Audio-reactive background and edge light** rendered in Metal: bass expands the artwork and
+  thickens the glow, mids move the gradient, highs add fine detail, onsets and beats fire short
+  smoothed impulses. Never flashing, never strobing.
+- **Hybrid Auto detection**: genre metadata when the player exposes it, otherwise a deterministic
+  heuristic over tempo, spectral balance, onsets, dynamics and rhythmic regularity, with
+  hysteresis so the profile stays stable for the track.
+- **Demo Mode** with eight original songs and one audio fixture per profile, so everything can
+  be tried without a player, permissions or network.
+- **Accessibility**: Reduce Motion, Increase Contrast, Reduce Transparency, VoiceOver labels and
+  full keyboard control.
 
 ## Requirements
 
@@ -13,7 +72,7 @@ press ⌘F, and let it run.
 - Xcode 16 or later (the project uses Xcode's synchronized folder groups). Built and tested with Xcode 26.
 - Spotify and/or Apple Music for real playback. Neither is required for Demo Mode.
 
-## Open and run
+## Build from source
 
 ```bash
 open Vela.xcodeproj
@@ -149,6 +208,20 @@ line-synced, estimated, unsynced) and every `TimedWord` records whether its time
 estimated. LRCLIB returns line-level timing, so its words are estimated by length and punctuation;
 enhanced LRC files (`<mm:ss.xx>` tags) are used verbatim. Plain lyrics fall back to a slowly
 scrolling unsynced mode.
+
+## Development hooks
+
+A few environment variables make the app scriptable for checks and screenshots:
+
+| Variable | Effect |
+| --- | --- |
+| `VELA_DEMO_TRACK=<id>` | Launch straight into a demo fixture (ids in `DemoCatalog.swift`) |
+| `VELA_ALWAYS_RENDER=1` | Keep the Metal scene rendering while the window is occluded |
+| `VELA_SCREENSHOT_PATH=/path.png` | Save the window to disk after `VELA_SCREENSHOT_DELAY` seconds |
+| `VELA_WINDOW_SIZE=1600x900` | Size the window before a capture |
+| `VELA_SCREENSHOT_SETTINGS=1`, `VELA_SCREENSHOT_ONBOARDING=1` | Show those layers in the capture |
+
+The README images were produced this way from Demo Mode.
 
 ## Real-integration limitations
 
