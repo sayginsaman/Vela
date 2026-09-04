@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/logo.png" width="128" alt="Vela app icon: a dark rounded square with a glowing multicolour frame and three lyric lines, the middle one lit">
+
 # Vela
 
 **Lyrics and light for whatever is playing.**

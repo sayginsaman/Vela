@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// Four-step welcome: what Vela is, the two permissions it uses, and how to start.
 struct OnboardingView: View {
@@ -50,6 +51,12 @@ struct OnboardingView: View {
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 16) {
             Spacer()
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 84, height: 84)
+                .shadow(color: .black.opacity(0.4), radius: 12, y: 6)
+                .accessibilityHidden(true)
             Text("Vela")
                 .font(.system(size: 52, weight: .bold)).kerning(-1.5)
                 .foregroundStyle(LinearGradient(colors: [model.palette.highlight.swiftUIColor, model.palette.glow.swiftUIColor], startPoint: .leading, endPoint: .trailing))
