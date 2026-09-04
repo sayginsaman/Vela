@@ -1,84 +1,143 @@
+<div align="center">
+
 # Vela
 
-Vela is a native macOS app that turns whatever is playing in Spotify or Apple Music into a
-full-screen stage: synchronized lyrics highlighted word by word, colours pulled from the album
-artwork, and an ambient light around all four edges of the display that follows the music.
-Every song gets a visual personality of its own: rap hits hard and dark, electronic pulses in
-neon, ambient drifts like liquid, acoustic stays hushed and spacious.
+**Lyrics and light for whatever is playing.**
 
-It is a normal foreground application, not a screensaver or lock-screen tweak. Open the window,
-press ⌘F, and let it run.
+Word-synced lyrics in the middle of the screen, colours pulled from the album art, and an
+ambient glow around the edges of the display that moves with the music.
+Works with Spotify and Apple Music on macOS. No accounts, no keys.
 
-<p align="center">
-  <img src="docs/screenshots/rap-trap.png" alt="Vela showing word-synced lyrics with a Rap / Trap visual profile" width="900">
-</p>
+<img src="docs/screenshots/rap-trap.png" width="820" alt="Vela in full screen: a dark scene with the current lyric line large in the centre, the word being sung lit in the album's accent colour, and a soft light around the edges of the display">
 
-## Download
+</div>
 
-Grab the latest disk image from the [Releases](../../releases) page, open it and drag Vela to
-Applications. The build is signed for local use only (no Apple Developer ID yet), so the first
-launch needs a right-click › Open, or:
+---
 
-```bash
-xattr -dr com.apple.quarantine /Applications/Vela.app
-```
+## What it does
 
-## Six visual profiles
+Vela reads the Spotify or Apple Music app running on your own machine. Track, artist,
+album, artwork, position and the previous / play-pause / next controls all work through the
+players' own scripting interfaces, so nothing needs to be signed in to.
 
-Vela listens to the music and picks a profile automatically, or you lock one in Settings.
-Every profile keeps the album artwork as its colour source and bends it: contrast, warmth,
-bloom, motion, particles and the way lyrics move all change.
+Lyrics come from the community LRCLIB database, from `.lrc` files you import, or from the
+songs bundled with Demo Mode. When a file carries word timing it is used as is; when only
+line timing exists, Vela estimates the words from their length and punctuation and says so
+in a small badge. Plain lyrics fall back to a slow, unsynced scroll. The word being sung fills
+with the album's accent colour and the previous and next lines stay visible, quieter, above
+and below.
+
+The light around the display is drawn on the GPU from the album palette. Bass expands the
+backdrop and thickens the glow, mids move the gradient, highs add fine detail, and beats
+fire short, smoothed impulses. It never flashes and never strobes. When nothing is playing,
+it settles into a slow breath.
+
+## Six personalities
+
+Different music gets a different visual character. Vela listens and picks a profile on its
+own, or you lock one in Settings. Every profile keeps the album artwork as its colour source
+and bends it: contrast, warmth, bloom, motion, particles and the way the lyrics move all
+change with it.
 
 <table>
-  <tr>
-    <td align="center"><img src="docs/screenshots/rap-trap.png" width="440" alt="Rap / Trap"><br><b>Rap / Trap</b><br><sub>bass-driven punches, dark backdrop, focused accents</sub></td>
-    <td align="center"><img src="docs/screenshots/rock-metal.png" width="440" alt="Rock / Metal"><br><b>Rock / Metal</b><br><sub>warm, high-contrast, drum-hit streaks</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/screenshots/electronic-dance.png" width="440" alt="Electronic / Dance"><br><b>Electronic / Dance</b><br><sub>beat-locked pulses, orbiting colour, travelling edge light</sub></td>
-    <td align="center"><img src="docs/screenshots/pop.png" width="440" alt="Pop"><br><b>Pop</b><br><sub>glossy blooms, balanced motion</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/screenshots/rnb-ambient.png" width="440" alt="R&B / Ambient"><br><b>R&amp;B / Ambient</b><br><sub>liquid gradients, slow waves, floating lyrics</sub></td>
-    <td align="center"><img src="docs/screenshots/acoustic-classical.png" width="440" alt="Acoustic / Classical"><br><b>Acoustic / Classical</b><br><sub>soft luminance, minimal light, phrase-driven motion</sub></td>
-  </tr>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/rap-trap.png" alt="Rap / Trap: a dark backdrop with focused purple accents and the active word punched in colour"><br><b>Rap / Trap</b><br><sub>Bass-driven punches, dark backdrop,<br>focused bright accents</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/rock-metal.png" alt="Rock / Metal: warm high-contrast colours with horizontal streaks flying off drum hits"><br><b>Rock / Metal</b><br><sub>Warm, high contrast,<br>streaks on the drum hits</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/electronic-dance.png" alt="Electronic / Dance: teal and magenta with neon bloom on the lyrics and a radial pulse"><br><b>Electronic / Dance</b><br><sub>Beat-locked pulses, orbiting colour,<br>light that travels round the edge</sub></td>
+<td align="center"><img src="docs/screenshots/pop.png" alt="Pop: gold and magenta blooms behind balanced lyrics"><br><b>Pop</b><br><sub>Glossy blooms,<br>balanced motion</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/rnb-ambient.png" alt="R&B / Ambient: soft purple liquid gradients with floating lyrics and a breathing indicator"><br><b>R&amp;B / Ambient</b><br><sub>Liquid gradients, slow waves,<br>lyrics that float</sub></td>
+<td align="center"><img src="docs/screenshots/acoustic-classical.png" alt="Acoustic / Classical: a hushed, desaturated scene with minimal edge light"><br><b>Acoustic / Classical</b><br><sub>Soft luminance, minimal light,<br>motion that follows phrasing</sub></td>
+</tr>
 </table>
 
-<p align="center">
-  <img src="docs/screenshots/settings.png" width="440" alt="Settings overlay with the Visual Profile section">
-  <img src="docs/screenshots/onboarding.png" width="440" alt="Onboarding">
-</p>
+Auto detection is hybrid. Apple Music exposes a genre, and that decides immediately.
+Spotify's scripting interface does not, so Vela measures the audio instead: tempo and how
+confident it is in it, bass against mids, brightness, how much the spectrum changes, how many
+onsets there are and how hard they hit, dynamic range, loudness and rhythmic regularity. It
+waits a few seconds, commits once it is confident, keeps that profile for the rest of the
+track, and only reconsiders if it was unsure to begin with or the music changes for good.
+Profiles crossfade rather than switch. Pop is the neutral fallback.
 
-## Highlights
+## Settings
 
-- **Word-by-word lyrics** from LRCLIB, imported `.lrc` files or the bundled demo songs, with
-  honest timing: word-synced, line-synced (words estimated) or plain.
-- **Album-art palette** extracted per track and corrected for readability, then styled by the
-  active profile.
-- **Audio-reactive background and edge light** rendered in Metal: bass expands the artwork and
-  thickens the glow, mids move the gradient, highs add fine detail, onsets and beats fire short
-  smoothed impulses. Never flashing, never strobing.
-- **Hybrid Auto detection**: genre metadata when the player exposes it, otherwise a deterministic
-  heuristic over tempo, spectral balance, onsets, dynamics and rhythmic regularity, with
-  hysteresis so the profile stays stable for the track.
-- **Demo Mode** with eight original songs and one audio fixture per profile, so everything can
-  be tried without a player, permissions or network.
-- **Accessibility**: Reduce Motion, Increase Contrast, Reduce Transparency, VoiceOver labels and
-  full keyboard control.
+Everything lives in one translucent panel over the scene: the visual profile, four sliders for
+how strongly the scene reacts (overall, background, edge light, lyric motion), particles, a
+gentler-motion toggle, a ten-second preview of any profile without touching playback, and an
+Analysis disclosure that shows what the detector is currently hearing.
 
-## Requirements
+<div align="center">
+<img src="docs/screenshots/settings.png" width="640" alt="Settings overlay showing the Visual Profile section with Auto selected, reaction sliders, particles and reduce-motion toggles, and the lyric style picker">
+</div>
 
-- macOS 14 Sonoma or later, Apple Silicon.
-- Xcode 16 or later (the project uses Xcode's synchronized folder groups). Built and tested with Xcode 26.
-- Spotify and/or Apple Music for real playback. Neither is required for Demo Mode.
+## Install
 
-## Build from source
+Download the latest `.dmg` from [Releases](https://github.com/sayginsaman/Vela/releases),
+open it, and drag Vela to your Applications folder. Releases are signed with a Developer ID
+and notarized by Apple, so the app opens like any other Mac app.
+
+On first run macOS asks whether Vela may control Spotify or Music. That is the standard
+Automation prompt and it is how the app reads what is playing. Vela also asks for Screen &
+System Audio Recording so the light can follow the sound; the microphone is never used and
+the audio is analysed on your Mac and never stored. Decline either and nothing breaks: the
+player state still shows and the light breathes on its own.
+
+Requires macOS 14 or later on Apple Silicon.
+
+## Using it
+
+**Full screen** is the whole point. Press ⌘F, or use the button in the controls bar. Escape
+leaves it again (after closing Settings, if that is open).
+
+**Controls** appear when you move the pointer or press Space, and fade after about three
+seconds while music plays. They carry the artwork, title and artist, a scrubbable progress
+bar, previous / play-pause / next, full screen and Settings.
+
+**Keyboard**
+
+| | |
+|---|---|
+| Space | Show controls, or play / pause while they are visible |
+| ← / → | Seek five seconds |
+| ⌘← / ⌘→ | Previous / next track |
+| ⌘F | Toggle full screen |
+| ⌘, | Settings |
+| ⌘⇧D | Demo Mode |
+| ⌘⇧N | Next demo fixture |
+| ⌘⇧P | Cycle the visual profile |
+| Esc | Close Settings, then leave full screen |
+
+**Lyric styles.** *Focus* keeps the current line centred with precise word highlighting and
+is the default. *Drift* lets the neighbouring lines recede through a little depth. *Bloom*
+makes each word swell and glow as it is sung. All three respect the visual profile's motion.
+
+**Timing.** If lyrics run early or late, the timing offset slider shifts them by up to five
+seconds either way. Imported `.lrc` files always win over anything fetched.
+
+**Accessibility.** Reduce Motion removes camera movement, punches and rapid scale changes
+and swaps spatial transitions for crossfades; colour and brightness reactions stay. Increase
+Contrast and Reduce Transparency are honoured, every control has a VoiceOver label, and the
+whole app works from the keyboard. Nothing ever flashes.
+
+## Demo Mode
+
+⌘⇧D, or "Try Demo" at the end of the welcome flow, needs no player, permissions or network.
+Vela plays an eight-song catalogue of original material with procedural artwork and a real-time
+timeline you can seek, skip and pause. Six of the songs are audio fixtures, one per profile:
+Concrete Halo, Wirecutter, Signal Bloom, Paper Lanterns, Low Tide Signal and Kitchen Light.
+Each generates its own kick, snare and hat patterns, section dynamics and spectral character,
+and that signal runs through exactly the analysis captured audio does, so Auto detection, the
+diagnostics and the reactive background behave the same. The other two songs show the
+unsynced and instrumental states. Settings has a track picker; ⌘⇧N cycles the fixtures.
+
+## Development
 
 ```bash
 open Vela.xcodeproj
 ```
-
-Select the **Vela** scheme and press Run, or from the terminal:
 
 ```bash
 xcodebuild -project Vela.xcodeproj -scheme Vela -configuration Debug build
@@ -88,70 +147,14 @@ xcodebuild -project Vela.xcodeproj -scheme Vela -configuration Debug build
 xcodebuild -project Vela.xcodeproj -scheme Vela -configuration Debug test
 ```
 
-The project signs ad hoc ("Sign to Run Locally"). Set your team in the target's Signing settings
-if you want macOS to remember the privacy permissions across rebuilds; with ad-hoc signing, TCC
-treats every new build as a new app and asks again.
+Xcode 16 or later; the project uses synchronized folder groups. The Metal shaders are compiled
+at runtime from source, so the Metal toolchain does not need to be installed. Local builds sign
+ad hoc, which means macOS asks for the privacy permissions again after every rebuild; set your
+team in Signing & Capabilities to avoid that. Release builds come from `scripts/release.sh`,
+which signs with a Developer ID Application certificate, notarizes, staples and packages the
+disk image (the one-time setup is described at the top of the script).
 
-The edge-glow shader is compiled at runtime from source (`EdgeGlowShaderSource.swift`), so the
-Metal shader toolchain does not need to be installed to build the project.
-
-## Using Vela
-
-| Action | How |
-| --- | --- |
-| Full screen | ⌘F (or the button in the controls bar) |
-| Reveal controls | Move the pointer, or press Space |
-| Play / pause | Space while controls are visible |
-| Seek ±5 s | ← / → (when the source supports seeking) |
-| Previous / next track | ⌘← / ⌘→ |
-| Settings | ⌘, |
-| Demo Mode | ⌘⇧D |
-| Close settings, then leave full screen | Esc |
-
-The controls bar hides after about three seconds of inactivity while music is playing.
-
-### Visual profiles
-
-Different music gets a different visual personality. Settings › Visual profile offers **Auto**
-(default) and six lockable profiles: Rap / Trap, Rock / Metal, Electronic / Dance, Pop,
-R&B / Ambient and Acoustic / Classical. A manual choice always wins until you return to Auto, and
-the choice persists across launches. Four sliders scale reactivity overall, the background, the
-edge light and lyric motion; particles and "reduce intense motion" are toggles. "Preview profile"
-plays a ten-second deterministic simulation of any profile over the current scene without
-touching playback, and the Analysis disclosure shows what the detector currently measures.
-
-Auto is hybrid. When the player exposes a genre (Apple Music does, Spotify's scripting interface
-does not) the genre string is normalised onto a profile immediately. Otherwise the system-audio
-features drive a deterministic heuristic (see Architecture). Detection waits for an initial
-window, locks once confident, keeps the profile for the track, and only re-evaluates when the
-initial confidence was low or the music changes substantially and persistently. Profiles
-crossfade rather than switch; Pop is the neutral fallback.
-
-Three lyric styles are available in Settings: **Focus** (default; centred line, precise word
-highlighting), **Drift** (neighbouring lines recede through depth) and **Bloom** (words swell and
-glow as they are sung). Settings also cover palette (automatic from artwork or manual), lyric size,
-glow thickness / intensity / spread, music-reactive motion, reduced effects, lyric timing offset
-(−5 s … +5 s), preferred music source, full-screen display and launch at login. Settings persist
-between launches.
-
-## Permissions and why
-
-Vela asks for two things, both explained during onboarding and both optional:
-
-1. **Automation (Apple Events) for Spotify and Music.** Vela reads the current track, position,
-   state and artwork and sends play/pause/skip/seek through each app's public AppleScript
-   dictionary. macOS shows a one-time prompt per app the first time Vela talks to it. Vela never
-   launches a player on its own; it only talks to players that are already running.
-2. **Screen & System Audio Recording.** The ambient light reacts to bass and loudness by analysing
-   the audio your Mac is playing, captured with ScreenCaptureKit (`capturesAudio` only; a 2×2 px
-   video stream is configured because the API needs a display filter, and its frames are
-   discarded). The microphone is never captured. Samples are analysed locally with Accelerate
-   and never stored. Without this permission the light breathes on its own.
-
-Denying either permission leaves the app fully usable. Permission state is shown in Settings with
-shortcuts to the relevant System Settings panes.
-
-## Architecture
+### Architecture
 
 Everything lives in one app target, grouped by responsibility:
 
@@ -209,7 +212,7 @@ estimated. LRCLIB returns line-level timing, so its words are estimated by lengt
 enhanced LRC files (`<mm:ss.xx>` tags) are used verbatim. Plain lyrics fall back to a slowly
 scrolling unsynced mode.
 
-## Development hooks
+### Environment hooks
 
 A few environment variables make the app scriptable for checks and screenshots:
 
@@ -223,7 +226,7 @@ A few environment variables make the app scriptable for checks and screenshots:
 
 The README images were produced this way from Demo Mode.
 
-## Real-integration limitations
+## Limitations
 
 - Spotify's AppleScript dictionary reports artwork as a URL, so Spotify artwork needs network
   access. Apple Music artwork comes straight from the app.
@@ -232,20 +235,6 @@ The README images were produced this way from Demo Mode.
 - LRCLIB is a community database. Coverage is good but not universal; lyrics are line-synced,
   never word-synced. The provider boundary (`LyricsProvider`) is ready for a word-level provider
   should one be added; no keys or paid services are used.
-- With ad-hoc signing, macOS re-asks for permissions after each rebuild (see above).
+- With ad-hoc local builds, macOS re-asks for permissions after each rebuild (see above).
 - macOS may require the app to be relaunched after Screen Recording permission is first granted.
 
-## Demo Mode
-
-Demo Mode (⌘⇧D, or "Try Demo" at the end of onboarding) needs no players, permissions or
-network. `DemoMusicSource` simulates an eight-track catalogue with a real-time timeline, seeking,
-skipping and pausing. Artwork is drawn procedurally per track and lyrics are original texts
-bundled as `.lrc`/`.txt` files. Six tracks are audio fixtures, one per visual profile (Concrete
-Halo → Rap / Trap, Wirecutter → Rock / Metal, Signal Bloom → Electronic / Dance, Paper Lanterns →
-Pop, Low Tide Signal → R&B / Ambient, Kitchen Light → Acoustic / Classical); the remaining two
-show the unsynced and instrumental states. Fixtures generate deterministic kick/snare/hat
-patterns, section dynamics and spectral character that run through the real `FeatureExtractor`,
-so Auto detection, the diagnostics and the reactive background behave exactly as with captured
-audio. Settings › Demo Mode picks a track directly; ⌘⇧N cycles the fixtures.
-
-All demo lyrics and artwork were created for this project.

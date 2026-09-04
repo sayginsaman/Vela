@@ -11,6 +11,17 @@
 #      (enter an app-specific password from account.apple.com when prompted)
 set -euo pipefail
 
+# Stapling fetches the ticket from Apple's CDN, which occasionally refuses connections right
+# after a submission is accepted; retry a few times before giving up.
+staple() {
+  for attempt in 1 2 3 4 5; do
+    if xcrun stapler staple "$1"; then return 0; fi
+    echo "stapler failed (attempt $attempt), retrying in 20 s"
+    sleep 20
+  done
+  return 1
+}
+
 VERSION=${1:?usage: scripts/release.sh <version> [profile]}
 PROFILE=${2:-VelaNotary}
 cd "$(dirname "$0")/.."
@@ -24,17 +35,20 @@ echo "▶ Building Release $VERSION"
 xcodebuild -project Vela.xcodeproj -scheme Vela -configuration Release -derivedDataPath build/DerivedData \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$IDENTITY" DEVELOPMENT_TEAM="$TEAM" \
   ENABLE_HARDENED_RUNTIME=YES OTHER_CODE_SIGN_FLAGS="--timestamp" MARKETING_VERSION="$VERSION" \
+  CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
   build | grep -E "error:|warning: .*sign|BUILD" || true
 
 APP=build/DerivedData/Build/Products/Release/Vela.app
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign -d --entitlements :- "$APP" | grep -q apple-events && echo "✓ Apple Events entitlement present"
+# Plain `xcodebuild build` would add the debug get-task-allow entitlement, which notarization rejects.
+codesign -d --entitlements :- "$APP" | grep -q get-task-allow && { echo "get-task-allow entitlement present; aborting"; exit 1; }
 
 echo "▶ Notarizing the app"
 rm -rf build/notarize && mkdir -p build/notarize
 ditto -c -k --keepParent "$APP" build/notarize/Vela.zip
 xcrun notarytool submit build/notarize/Vela.zip --keychain-profile "$PROFILE" --wait
-xcrun stapler staple "$APP"
+staple "$APP"
 
 echo "▶ Building the disk image"
 rm -rf build/dmg && mkdir -p build/dmg/staging
@@ -46,6 +60,6 @@ codesign --sign "$IDENTITY" --timestamp "$DMG"
 
 echo "▶ Notarizing the disk image"
 xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
-xcrun stapler staple "$DMG"
+staple "$DMG"
 spctl -a -t open --context context:primary-signature -v "$DMG"
 echo "✓ $DMG is signed, notarized and stapled"
