@@ -141,8 +141,26 @@ struct BreathingIndicator: View {
     let size: CGFloat
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+        TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion && countdown == nil)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
+            let arcProgress: Double? = countdown.flatMap { $0 < 4.5 ? 1 - $0 / 4.5 : nil }
+            ZStack {
+                // A thin arc fills in over the last seconds before the next line lands.
+                if let arcProgress {
+                    Circle().stroke(color.opacity(0.16), lineWidth: 1.5)
+                    Circle().trim(from: 0, to: arcProgress)
+                        .stroke(color.opacity(0.9), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 0.1), value: arcProgress)
+                }
+                dots(t: t)
+            }
+            .frame(width: size * 6.2, height: size * 6.2)
+        }
+        .accessibilityLabel("Instrumental")
+    }
+
+    private func dots(t: Double) -> some View {
             HStack(spacing: size * 0.9) {
                 ForEach(0..<3, id: \.self) { index in
                     let pulse = reduceMotion ? 0.6 : 0.42 + 0.58 * (0.5 + 0.5 * sin(t * 2.0 - Double(index) * 0.95))
@@ -158,7 +176,5 @@ struct BreathingIndicator: View {
                         .animation(.easeOut(duration: 0.25), value: lit)
                 }
             }
-        }
-        .accessibilityLabel("Instrumental")
     }
 }

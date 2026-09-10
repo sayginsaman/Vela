@@ -16,3 +16,10 @@ enum TimeFormatting {
         return String(format: "%+.1f s", seconds)
     }
 }
+
+extension Double {
+    func rounded(toNearest step: Double) -> Double {
+        guard step > 0 else { return self }
+        return (self / step).rounded() * step
+    }
+}

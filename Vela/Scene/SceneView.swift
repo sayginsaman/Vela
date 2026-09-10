@@ -51,7 +51,7 @@ struct SceneView: View {
         let palette = model.palette
         switch model.stage {
         case .lyrics(let box):
-            LyricsStageView(box: box, typography: typography, clock: model.clock, offset: model.settings.lyricsOffset, director: model.director)
+            LyricsStageView(box: box, typography: typography, clock: model.clock, offset: model.lyricTimeShift, director: model.director)
                 .padding(.vertical, 60)
         case .unsynced(let box):
             UnsyncedLyricsView(box: box, typography: typography, clock: model.clock)
@@ -144,6 +144,28 @@ struct SceneView: View {
             .opacity(model.overlayVisible ? 1 : 0)
             .animation(.easeInOut(duration: 0.35), value: model.overlayVisible)
 
+            // Song progress as a hairline along the bottom edge while the controls are hidden.
+            VStack {
+                Spacer()
+                ProgressHairline()
+                    .opacity(!model.overlayVisible && model.track != nil ? 1 : 0)
+            }
+            .allowsHitTesting(false)
+            .animation(.easeInOut(duration: 0.5), value: model.overlayVisible)
+
+            if model.introVisible, !model.overlayVisible, let track = model.track {
+                VStack {
+                    Spacer()
+                    HStack {
+                        TrackIntroCard(track: track, palette: model.palette, reduceTransparency: model.reduceTransparency)
+                        Spacer()
+                    }
+                }
+                .padding(28)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .allowsHitTesting(false)
+            }
+
             if let toast = model.toast {
                 VStack {
                     Spacer()
@@ -164,6 +186,64 @@ struct SceneView: View {
         }
         .animation(.easeInOut(duration: 0.25), value: model.settingsVisible)
         .animation(.easeInOut(duration: 0.3), value: model.toast)
+        .animation(.easeInOut(duration: 0.6), value: model.introVisible)
+    }
+}
+
+/// Thin progress line along the bottom edge, visible only while the controls are hidden.
+private struct ProgressHairline: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+            let duration = model.track?.duration ?? 0
+            let fraction = duration > 0 ? min(1, max(0, model.clock.position(at: context.date) / duration)) : 0
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(Color.white.opacity(0.08))
+                    Rectangle()
+                        .fill(LinearGradient(colors: [model.palette.glow.swiftUIColor, model.palette.highlight.swiftUIColor], startPoint: .leading, endPoint: .trailing))
+                        .frame(width: proxy.size.width * fraction)
+                        .animation(.linear(duration: 0.5), value: fraction)
+                }
+            }
+            .frame(height: 2)
+            .opacity(0.7)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Bottom-left title card that appears for a few seconds when a track starts.
+private struct TrackIntroCard: View {
+    let track: TrackInfo
+    let palette: Palette
+    let reduceTransparency: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("NOW PLAYING")
+                .font(.system(size: 10, weight: .semibold)).tracking(1.6)
+                .foregroundStyle(palette.highlight.swiftUIColor.opacity(0.9))
+            Text(track.title)
+                .font(.system(size: 24, weight: .semibold)).kerning(-0.3)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            if !track.artist.isEmpty {
+                Text(track.artist)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 18).padding(.vertical, 14)
+        .frame(maxWidth: 420, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.black.opacity(reduceTransparency ? 0.85 : 0.42))
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.white.opacity(0.1)))
+        )
+        .accessibilityElement(children: .combine)
     }
 }
 

@@ -1,8 +1,15 @@
 import Foundation
 
-/// Declarative description of how a profile moves and glows. Every field is a plain number so
-/// presets can be interpolated for crossfades and transformed for accessibility.
+/// Typeface family used for lyrics; categorical, so it switches at the end of a crossfade.
+enum LyricTypeface: String, Sendable, Equatable {
+    case sans, serif, rounded
+}
+
+/// Declarative description of how a profile moves and glows. Every numeric field can be
+/// interpolated for crossfades and transformed for accessibility.
 struct VisualProfilePreset: Equatable, Sendable {
+    var typeface: LyricTypeface = .sans
+
     // Lyric motion
     var tempo: Double
     var springResponse: Double
@@ -69,8 +76,48 @@ struct VisualProfilePreset: Equatable, Sendable {
         case .pop: return .pop
         case .rnbAmbient: return .rnbAmbient
         case .acousticClassical: return .acousticClassical
+        case .jazzBlues: return .jazzBlues
+        case .latinAfrobeats: return .latinAfrobeats
+        case .indieAlternative: return .indieAlternative
         }
     }
+
+    static let jazzBlues: VisualProfilePreset = {
+        var p = VisualProfilePreset(
+            tempo: 0.8, springResponse: 0.7, springDamping: 0.9, transitionDuration: 0.7,
+            activeWordScale: 1.03, activeWordBloom: 0.4, wordPunch: 0, trackingShift: 0.4, lineDepth: 0.4,
+            gradientSpeed: 0.4, gradientDistortion: 0.2, orbit: 0.15, liquid: 0.8, compress: 0.25, bloom: 0.4,
+            vignette: 0.55, grain: 0.09, blurReaction: 0.3, cameraMotion: 0, slices: 0, streaks: 0, ring: 0,
+            edgeThickness: 0.8, glowSpread: 1.3, edgeTravel: 0.05,
+            beatImpulse: 0.3, bassResponse: 0.4, midResponse: 0.6, highResponse: 0.4, onsetResponse: 0.5, idleBreathing: 0.7,
+            particleDensity: 0.2, particleLifetime: 6.0, particleSpeed: 0.3, particleStreak: 0, particleMirror: 0,
+            paletteSaturation: 0.85, paletteContrast: 0.95, paletteWarmth: 0.1, paletteBrightness: 0.98, highlightEmphasis: 0.95,
+            crossfadeDuration: 2.5)
+        p.typeface = .serif
+        return p
+    }()
+
+    static let latinAfrobeats = VisualProfilePreset(
+        tempo: 1.1, springResponse: 0.4, springDamping: 0.75, transitionDuration: 0.4,
+        activeWordScale: 1.06, activeWordBloom: 0.7, wordPunch: 4, trackingShift: 0, lineDepth: 0.3,
+        gradientSpeed: 1.0, gradientDistortion: 0.3, orbit: 0.5, liquid: 0.5, compress: 0.6, bloom: 0.75,
+        vignette: 0.4, grain: 0.05, blurReaction: 0.5, cameraMotion: 0.15, slices: 0.4, streaks: 0, ring: 0.4,
+        edgeThickness: 1.05, glowSpread: 1.0, edgeTravel: 0.5,
+        beatImpulse: 0.85, bassResponse: 0.8, midResponse: 0.7, highResponse: 0.7, onsetResponse: 0.8, idleBreathing: 1.0,
+        particleDensity: 0.5, particleLifetime: 2.5, particleSpeed: 1.0, particleStreak: 0, particleMirror: 0.3,
+        paletteSaturation: 1.3, paletteContrast: 1.05, paletteWarmth: 0.08, paletteBrightness: 1.05, highlightEmphasis: 1.15,
+        crossfadeDuration: 1.8)
+
+    static let indieAlternative = VisualProfilePreset(
+        tempo: 0.9, springResponse: 0.6, springDamping: 0.85, transitionDuration: 0.6,
+        activeWordScale: 1.04, activeWordBloom: 0.4, wordPunch: 0, trackingShift: 0, lineDepth: 0.45,
+        gradientSpeed: 0.6, gradientDistortion: 0.3, orbit: 0.2, liquid: 0.7, compress: 0.3, bloom: 0.45,
+        vignette: 0.55, grain: 0.12, blurReaction: 0.35, cameraMotion: 0.05, slices: 0, streaks: 0.2, ring: 0,
+        edgeThickness: 0.9, glowSpread: 1.2, edgeTravel: 0.1,
+        beatImpulse: 0.45, bassResponse: 0.5, midResponse: 0.7, highResponse: 0.45, onsetResponse: 0.6, idleBreathing: 0.8,
+        particleDensity: 0.3, particleLifetime: 5.0, particleSpeed: 0.4, particleStreak: 0, particleMirror: 0,
+        paletteSaturation: 0.8, paletteContrast: 0.9, paletteWarmth: 0.04, paletteBrightness: 1.0, highlightEmphasis: 0.95,
+        crossfadeDuration: 2.2)
 
     static let rapTrap = VisualProfilePreset(
         tempo: 1.25, springResponse: 0.42, springDamping: 0.78, transitionDuration: 0.35,
@@ -127,7 +174,13 @@ struct VisualProfilePreset: Equatable, Sendable {
         paletteSaturation: 0.9, paletteContrast: 0.85, paletteWarmth: 0.05, paletteBrightness: 0.95, highlightEmphasis: 0.9,
         crossfadeDuration: 3.5)
 
-    static let acousticClassical = VisualProfilePreset(
+    static let acousticClassical: VisualProfilePreset = {
+        var p = acousticClassicalBase
+        p.typeface = .serif
+        return p
+    }()
+
+    private static let acousticClassicalBase = VisualProfilePreset(
         tempo: 0.6, springResponse: 0.9, springDamping: 0.96, transitionDuration: 1.0,
         activeWordScale: 1.02, activeWordBloom: 0.25, wordPunch: 0, trackingShift: 0, lineDepth: 0.2,
         gradientSpeed: 0.25, gradientDistortion: 0.08, orbit: 0.1, liquid: 0.5, compress: 0.15, bloom: 0.3,
@@ -158,6 +211,7 @@ struct VisualProfilePreset: Equatable, Sendable {
         for path in Self.fields {
             result[keyPath: path] = self[keyPath: path] + (other[keyPath: path] - self[keyPath: path]) * t
         }
+        result.typeface = t >= 0.5 ? other.typeface : typeface
         return result
     }
 

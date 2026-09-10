@@ -34,12 +34,12 @@ backdrop and thickens the glow, mids move the gradient, highs add fine detail, a
 fire short, smoothed impulses. It never flashes and never strobes. When nothing is playing,
 it settles into a slow breath.
 
-## Six personalities
+## Nine personalities
 
 Different music gets a different visual character. Vela listens and picks a profile on its
 own, or you lock one in Settings. Every profile keeps the album artwork as its colour source
-and bends it: contrast, warmth, bloom, motion, particles and the way the lyrics move all
-change with it.
+and bends it: contrast, warmth, bloom, motion, particles, typeface and the way the lyrics move
+all change with it.
 
 <table>
 <tr>
@@ -52,7 +52,15 @@ change with it.
 </tr>
 <tr>
 <td align="center"><img src="docs/screenshots/rnb-ambient.png" alt="R&B / Ambient: soft purple liquid gradients with floating lyrics and a breathing indicator"><br><b>R&amp;B / Ambient</b><br><sub>Liquid gradients, slow waves,<br>lyrics that float</sub></td>
-<td align="center"><img src="docs/screenshots/acoustic-classical.png" alt="Acoustic / Classical: a hushed, desaturated scene with minimal edge light"><br><b>Acoustic / Classical</b><br><sub>Soft luminance, minimal light,<br>motion that follows phrasing</sub></td>
+<td align="center"><img src="docs/screenshots/acoustic-classical.png" alt="Acoustic / Classical: a hushed, desaturated scene with serif lyrics and minimal edge light"><br><b>Acoustic / Classical</b><br><sub>Soft luminance, serif type,<br>motion that follows phrasing</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/jazz-blues.png" alt="Jazz / Blues: smoky amber light with serif lyrics"><br><b>Jazz / Blues</b><br><sub>Smoky amber light, serif type,<br>swing rather than pulse</sub></td>
+<td align="center"><img src="docs/screenshots/latin-afrobeats.png" alt="Latin / Afrobeats: tropical colour with syncopated punches"><br><b>Latin / Afrobeats</b><br><sub>Tropical colour, syncopated punches,<br>percussive sparkle</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/indie-alternative.png" alt="Indie / Alternative: hazy film grain and muted colour"><br><b>Indie / Alternative</b><br><sub>Hazy film grain, muted colour,<br>unhurried drift</sub></td>
+<td align="center"><img src="docs/screenshots/settings.png" alt="Settings overlay with the Visual Profile section"><br><b>Settings</b><br><sub>Auto or lock, four reaction sliders,<br>previews and analysis</sub></td>
 </tr>
 </table>
 
@@ -70,10 +78,6 @@ Everything lives in one translucent panel over the scene: the visual profile, fo
 how strongly the scene reacts (overall, background, edge light, lyric motion), particles, a
 gentler-motion toggle, a ten-second preview of any profile without touching playback, and an
 Analysis disclosure that shows what the detector is currently hearing.
-
-<div align="center">
-<img src="docs/screenshots/settings.png" width="640" alt="Settings overlay showing the Visual Profile section with Auto selected, reaction sliders, particles and reduce-motion toggles, and the lyric style picker">
-</div>
 
 ## Install
 
@@ -110,14 +114,20 @@ bar, previous / play-pause / next, full screen and Settings.
 | ⌘⇧D | Demo Mode |
 | ⌘⇧N | Next demo fixture |
 | ⌘⇧P | Cycle the visual profile |
+| [ / ] | Nudge lyrics later / earlier by 0.1 s |
 | Esc | Close Settings, then leave full screen |
 
 **Lyric styles.** *Focus* keeps the current line centred with precise word highlighting and
 is the default. *Drift* lets the neighbouring lines recede through a little depth. *Bloom*
 makes each word swell and glow as it is sung. All three respect the visual profile's motion.
 
-**Timing.** If lyrics run early or late, the timing offset slider shifts them by up to five
-seconds either way. Imported `.lrc` files always win over anything fetched.
+**Timing.** Vela stamps the player's position at the moment it was read rather than after the
+scripting round trip, shifts lyrics by the output device's reported latency (Bluetooth headphones
+add well over a hundred milliseconds; switch this off in Settings if it feels wrong), and lands
+highlights a few dozen milliseconds ahead of the sound, which is what reads as "in time". If a
+particular file still runs early or late, press `[` or `]` while watching to nudge it in tenths of
+a second, or use the offset slider in Settings. Imported `.lrc` files always win over anything
+fetched.
 
 **Accessibility.** Reduce Motion removes camera movement, punches and rapid scale changes
 and swaps spatial transitions for crossfades; colour and brightness reactions stay. Increase
@@ -127,9 +137,10 @@ whole app works from the keyboard. Nothing ever flashes.
 ## Demo Mode
 
 ⌘⇧D, or "Try Demo" at the end of the welcome flow, needs no player, permissions or network.
-Vela plays an eight-song catalogue of original material with procedural artwork and a real-time
-timeline you can seek, skip and pause. Six of the songs are audio fixtures, one per profile:
-Concrete Halo, Wirecutter, Signal Bloom, Paper Lanterns, Low Tide Signal and Kitchen Light.
+Vela plays an eleven-song catalogue of original material with procedural artwork and a real-time
+timeline you can seek, skip and pause. Nine of the songs are audio fixtures, one per profile:
+Concrete Halo, Wirecutter, Signal Bloom, Paper Lanterns, Low Tide Signal, Kitchen Light, Velvet
+Hour, Fuego Lento and Glass Orchards.
 Each generates its own kick, snare and hat patterns, section dynamics and spectral character,
 and that signal runs through exactly the analysis captured audio does, so Auto detection, the
 diagnostics and the reactive background behave the same. The other two songs show the

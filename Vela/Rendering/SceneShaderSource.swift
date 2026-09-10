@@ -132,6 +132,11 @@ enum SceneShaderSource {
         if (lightLuma > 0.45) { light *= 0.45 / lightLuma; }
         color = 1.0 - (1.0 - color) * (1.0 - light);
 
+        // Stage spotlight behind the lyrics: a soft pool of the accent colour that swells with loudness.
+        float2 sc = (uv - 0.5) * float2(aspect, 1.0);
+        float spot = exp(-dot(sc, sc) * 5.5) * (0.05 + 0.09 * u.flags.z);
+        color = 1.0 - (1.0 - color) * (1.0 - u.palette[2].rgb * spot);
+
         // Radial pulse in time with the beat (electronic).
         float ringAmount = u.style.z;
         if (ringAmount > 0.001) {
@@ -203,7 +208,8 @@ enum SceneShaderSource {
         float thick = u.edge.x * (1.0 + 0.85 * bassDrive);
         float core = exp(-d / thick);
         float halo = exp(-d / (thick * 2.6 * u.edge.z)) * (0.22 + 0.18 * bassDrive);
-        float shimmer = 1.0 + highDrive * 0.12 * sin(angle * 40.0 + t * 3.0);
+        // Six whole cycles around the rim so the shimmer is continuous where the angle wraps.
+        float shimmer = 1.0 + highDrive * 0.12 * sin(angle * 37.699 + t * 3.0);
         float bright = u.edge.y * (0.4 + 0.5 * levelDrive) * shimmer * (1.0 + traveller * 0.8);
         float glow = clamp((core + halo) * bright, 0.0, 1.0);
         glowColor = mix(glowColor, float3(1.0), core * 0.16 * bright);

@@ -5,8 +5,13 @@ final class GenreNormalizerTests: XCTestCase {
     func testMapsCommonGenreStrings() {
         let cases: [(String, VisualProfile?)] = [
             ("Hip-Hop/Rap", .rapTrap), ("Trap", .rapTrap), ("UK Drill", .rapTrap), ("hip hop", .rapTrap),
-            ("Rock", .rockMetal), ("Heavy Metal", .rockMetal), ("Pop Punk", .pop), ("Alternative", .rockMetal),
-            ("Grunge", .rockMetal), ("Indie Rock", .rockMetal), ("Punk", .rockMetal),
+            ("Rock", .rockMetal), ("Heavy Metal", .rockMetal), ("Pop Punk", .pop), ("Alternative Rock", .rockMetal),
+            ("Grunge", .rockMetal), ("Punk", .rockMetal),
+            ("Alternative", .indieAlternative), ("Indie", .indieAlternative), ("Indie Rock", .indieAlternative),
+            ("Dream Pop", .indieAlternative), ("Shoegaze", .indieAlternative),
+            ("Jazz", .jazzBlues), ("Blues", .jazzBlues), ("Smooth Jazz", .jazzBlues), ("Bossa Nova", .jazzBlues),
+            ("Latin", .latinAfrobeats), ("Reggaeton", .latinAfrobeats), ("Afrobeats", .latinAfrobeats),
+            ("Latin Pop", .latinAfrobeats), ("Dancehall", .latinAfrobeats), ("Salsa", .latinAfrobeats),
             ("Electronic", .electronicDance), ("EDM", .electronicDance), ("Deep House", .electronicDance),
             ("Techno", .electronicDance), ("Trance", .electronicDance), ("Synthwave", .electronicDance),
             ("Drum & Bass", .electronicDance),
@@ -15,7 +20,7 @@ final class GenreNormalizerTests: XCTestCase {
             ("Chill", .rnbAmbient), ("Neo-Soul", .rnbAmbient),
             ("Acoustic", .acousticClassical), ("Classical", .acousticClassical), ("Piano", .acousticClassical),
             ("Folk", .acousticClassical), ("Orchestral", .acousticClassical), ("Singer/Songwriter", .acousticClassical),
-            ("Jazz", .acousticClassical),
+            ("Indie Folk", .acousticClassical),
             ("", nil), ("Podcast", nil), ("Unknown Genre", nil),
         ]
         for (genre, expected) in cases {
@@ -28,7 +33,8 @@ final class GenreNormalizerTests: XCTestCase {
         // "dance" alone is electronic, but "dance pop" is pop.
         XCTAssertEqual(GenreNormalizer.profile(for: "Dance"), .electronicDance)
         XCTAssertEqual(GenreNormalizer.profile(for: "Dance Pop"), .pop)
-        XCTAssertEqual(GenreNormalizer.profile(for: "Indie Rock"), .rockMetal)
+        XCTAssertEqual(GenreNormalizer.profile(for: "Alternative Rock"), .rockMetal)
+        XCTAssertEqual(GenreNormalizer.profile(for: "Indie Rock"), .indieAlternative)
         XCTAssertEqual(GenreNormalizer.profile(for: "Indie Pop"), .pop)
     }
 
@@ -76,6 +82,18 @@ enum SyntheticFeatures {
             f.bpm = 72; f.bpmConfidence = 0.3; f.bassToMid = 0.1; f.spectralCentroid = 0.48; f.highEnergy = 0.15
             f.transientStrength = 0.25; f.rhythmicRegularity = 0.5; f.onsetDensity = 2.0; f.averageLoudness = 0.4
             f.dynamicRange = 0.8; f.spectralFlux = 0.1
+        case .jazzBlues:
+            f.bpm = 118; f.bpmConfidence = 0.4; f.bassToMid = 0.45; f.spectralCentroid = 0.47; f.highEnergy = 0.35
+            f.transientStrength = 0.48; f.rhythmicRegularity = 0.45; f.onsetDensity = 3.5; f.averageLoudness = 0.5
+            f.dynamicRange = 0.6; f.spectralFlux = 0.28
+        case .latinAfrobeats:
+            f.bpm = 96; f.bpmConfidence = 0.75; f.bassToMid = 0.68; f.spectralCentroid = 0.56; f.highEnergy = 0.65
+            f.transientStrength = 0.7; f.rhythmicRegularity = 0.72; f.onsetDensity = 6; f.averageLoudness = 0.75
+            f.dynamicRange = 0.28; f.spectralFlux = 0.48
+        case .indieAlternative:
+            f.bpm = 124; f.bpmConfidence = 0.6; f.bassToMid = 0.4; f.spectralCentroid = 0.58; f.highEnergy = 0.48
+            f.transientStrength = 0.46; f.rhythmicRegularity = 0.62; f.onsetDensity = 3.5; f.averageLoudness = 0.56
+            f.dynamicRange = 0.4; f.spectralFlux = 0.39
         }
         f.bands = AudioBands(bass: f.bassToMid, mid: 0.5, high: f.highEnergy, level: f.averageLoudness)
         return f

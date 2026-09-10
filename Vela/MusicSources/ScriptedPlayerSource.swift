@@ -37,10 +37,15 @@ class ScriptedPlayerSource: MusicSource, @unchecked Sendable {
 
     func snapshot() async throws -> PlaybackSnapshot {
         guard await isAvailable() else { throw MusicSourceError.notRunning }
+        let started = Date()
         let result = try await runner.run(snapshotScript)
+        // The position is read early in the script; stamping it after the whole round trip
+        // would make every lyric run late by the script's latency.
+        let elapsed = Date().timeIntervalSince(started)
+        let observedAt = started.addingTimeInterval(elapsed * 0.35)
         guard case .text(let text) = result else { throw MusicSourceError.scriptFailed("No response") }
         let fields = text.components(separatedBy: Self.separator)
-        let snapshot = parseSnapshot(fields, observedAt: Date())
+        let snapshot = parseSnapshot(fields, observedAt: observedAt)
         VelaLog.sources.debug("\(self.kind.rawValue, privacy: .public) state=\(fields.first ?? "-", privacy: .public) parsed=\(snapshot.state.rawValue, privacy: .public) pos=\(snapshot.position, privacy: .public)")
         return snapshot
     }

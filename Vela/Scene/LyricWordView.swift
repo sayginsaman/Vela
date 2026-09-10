@@ -29,9 +29,15 @@ struct LyricTypography: Equatable {
     }
 
     /// One weight for every role so a line never re-wraps when it becomes current; the current
-    /// line is distinguished by colour, scale and bloom instead.
+    /// line is distinguished by colour, scale and bloom instead. The family follows the profile.
     func font(current: Bool) -> Font {
-        .system(size: fontSize, weight: .bold, design: .default)
+        let design: Font.Design
+        switch motion.typeface {
+        case .sans: design = .default
+        case .serif: design = .serif
+        case .rounded: design = .rounded
+        }
+        return .system(size: fontSize, weight: .bold, design: design)
     }
 
     var upcomingOpacity: Double { increaseContrast ? 0.62 : 0.36 }
@@ -148,6 +154,19 @@ struct LyricWordView: View {
                     }
                     .shadow(color: typography.palette.highlight.swiftUIColor.opacity(bloomOpacity), radius: bloomRadius)
                     .opacity(highlightOpacity)
+            }
+            // A bright glint riding the fill edge while the word is being sung.
+            if isActive, fill > 0.03, fill < 0.97, !typography.reduceEffects {
+                base.foregroundStyle(.white)
+                    .mask(alignment: .leading) {
+                        GeometryReader { proxy in
+                            let width = typography.fontSize * 0.5
+                            LinearGradient(colors: [.clear, .white, .clear], startPoint: .leading, endPoint: .trailing)
+                                .frame(width: width)
+                                .offset(x: proxy.size.width * fill - width / 2)
+                        }
+                    }
+                    .opacity(0.7)
             }
         }
         .fixedSize()

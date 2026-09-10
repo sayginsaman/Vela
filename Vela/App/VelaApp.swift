@@ -34,6 +34,11 @@ struct VelaApp: App {
                     .keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Import Lyrics File…") { model.importLyricsFile() }
                     .disabled(model.track == nil)
+                Divider()
+                Button("Lyrics Earlier") { model.nudgeLyricsOffset(by: LyricTiming.nudgeStep) }
+                    .keyboardShortcut("]", modifiers: .command)
+                Button("Lyrics Later") { model.nudgeLyricsOffset(by: -LyricTiming.nudgeStep) }
+                    .keyboardShortcut("[", modifiers: .command)
             }
             CommandMenu("Visual") {
                 Picker("Profile", selection: Binding(get: { model.settings.visualProfile }, set: { model.settings.visualProfile = $0 })) {

@@ -80,6 +80,8 @@ struct VelaSettings: Codable, Equatable, Sendable {
     var lyricMotionIntensity: Double = 1.0   // 0...1.5
     var particlesEnabled: Bool = true
     var reduceIntenseMotion: Bool = false
+    /// Shift lyrics earlier by the output device's reported latency (Bluetooth adds a lot).
+    var compensateOutputLatency: Bool = true
 
     static let reactionRange: ClosedRange<Double> = 0...1.5
 
@@ -112,6 +114,7 @@ struct VelaSettings: Codable, Equatable, Sendable {
         lyricMotionIntensity = try c.decodeIfPresent(Double.self, forKey: .lyricMotionIntensity) ?? base.lyricMotionIntensity
         particlesEnabled = try c.decodeIfPresent(Bool.self, forKey: .particlesEnabled) ?? base.particlesEnabled
         reduceIntenseMotion = try c.decodeIfPresent(Bool.self, forKey: .reduceIntenseMotion) ?? base.reduceIntenseMotion
+        compensateOutputLatency = try c.decodeIfPresent(Bool.self, forKey: .compensateOutputLatency) ?? base.compensateOutputLatency
     }
 
     static let lyricSizeRange: ClosedRange<Double> = 0.7...1.6

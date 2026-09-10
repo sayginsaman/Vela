@@ -20,6 +20,9 @@ struct ProfileFixture: Sendable, Equatable {
         case .pop: return 112
         case .rnbAmbient: return 84
         case .acousticClassical: return 72
+        case .jazzBlues: return 118
+        case .latinAfrobeats: return 96
+        case .indieAlternative: return 124
         }
     }
 
@@ -104,6 +107,78 @@ struct ProfileFixture: Sendable, Equatable {
             high = 0.03 + 0.05 * pad + 0.08 * snare
             centroid = 0.24 + 0.04 * snare
             transient = kick * 0.22 + snare * 0.25
+        case .jazzBlues:
+            // Swing with a drifting feel: ride on swung eighths, walking bass, brushed snare, sparse
+            // piano comping placed off the grid, and long phrase swells.
+            let swingRatio: Double = 0.62 + 0.08 * sin(position * 0.37)
+            let swung: Double = beatPhase < swingRatio
+                ? beatPhase / swingRatio * 0.5
+                : 0.5 + (beatPhase - swingRatio) / (1 - swingRatio) * 0.5
+            let ridePhase: Double = (swung * 2) - floor(swung * 2)
+            let ride: Double = exp(-ridePhase * 9) * 0.62
+            let walkPush: Double = 0.09 * sin(beat * 1.9) + 0.05 * sin(beat * 0.7)
+            let walkPhase: Double = ((beatPhase + walkPush) + 1).truncatingRemainder(dividingBy: 1)
+            let walk: Double = exp(-walkPhase * 5) * 0.55
+            let brushOn = (beatIndex == 1 || beatIndex == 3) && Int(bar) % 5 != 2
+            let brush: Double = brushOn ? exp(-beatPhase * 6) * 0.3 : 0
+            let compTime: Double = beat * 3 + 0.21 * sin(bar * 0.9)
+            let compSlot = Int(floor(compTime))
+            let compPhase: Double = compTime - floor(compTime)
+            let compHits = compSlot % 7 == 0 || compSlot % 11 == 3 || compSlot % 13 == 5
+            let comp: Double = compHits ? exp(-compPhase * 8) * 0.9 : 0
+            let swell: Double = sin(bar / 1.5 * Double.pi) * 0.5 + 0.5
+            let phrase: Double = 0.3 + 0.7 * pow(swell, 1.2)
+            bass = (0.24 + 0.42 * walk) * phrase
+            let midBody: Double = 0.3 + 0.34 * comp
+            mid = (midBody + 0.15 * brush + 0.12 * walk) * phrase
+            high = (0.06 + 0.26 * ride + 0.1 * brush) * phrase
+            centroid = 0.46 + 0.04 * ride
+            let hits: Double = walk * 0.4 + brush * 0.45
+            let accents: Double = comp * 0.75 + ride * 0.3
+            transient = (hits + accents) * (0.6 + 0.4 * phrase)
+        case .latinAfrobeats:
+            // Reggaeton / afrobeats grid: dembow kicks, clap on 2 and 4, rims and congas on the beat
+            // grid, a hat accent every beat, shakers on 16ths and a guiro scrape underneath.
+            let step = sixteenthIndex
+            let kick: Double = [0, 6, 8, 14].contains(step) ? exp(-sixteenth * 7) : 0
+            let clap: Double = (step == 4 || step == 12) ? exp(-sixteenth * 11) * 0.9 : 0
+            let rim: Double = (step == 2 || step == 10) ? exp(-sixteenth * 12) * 0.7 : 0
+            let hatAccent: Double = (step % 4 == 0) ? exp(-sixteenth * 12) * 0.85 : 0
+            let shaker: Double = exp(-sixteenth * 14) * 0.7
+            let conga: Double = (step % 4 == 3) ? exp(-sixteenth * 10) * 0.6 : 0
+            let guiro: Double = 0.5 + 0.5 * sin(position * 50)
+            let section: Double = Int(bar / 8).isMultiple(of: 2) ? 0.85 : 1.0
+            let bassline: Double = 0.48 + 0.42 * kick + 0.1 * sin(beat * Double.pi * 0.5)
+            bass = bassline * section
+            let midBody: Double = 0.34 + 0.35 * rim + 0.4 * clap
+            mid = (midBody + 0.3 * conga + 0.1 * kick) * section
+            let highBody: Double = 0.2 + 0.5 * shaker + 0.3 * rim + 0.3 * clap
+            high = (highBody + 0.3 * hatAccent + 0.15 * conga) * section
+            centroid = 0.52 + 0.05 * rim + 0.03 * clap
+            let drums: Double = kick * 0.8 + clap * 0.9 + rim * 0.7 + conga * 0.6
+            let texture: Double = shaker * 0.6 + hatAccent * 0.8 + 0.2 * guiro
+            transient = drums + texture
+        case .indieAlternative:
+            // Jangly guitars with constant shimmer, kick 1 & 3, snare 2 & 4, loose tambourine, quiet verses
+            // against bigger choruses.
+            let chorus: Double = Int(bar / 8).isMultiple(of: 2) ? 0.0 : 1.0
+            let breath: Double = 0.9 + 0.1 * sin(bar / 2 * Double.pi)
+            let energy: Double = (0.36 + 0.58 * chorus) * breath
+            let kick: Double = (beatIndex == 0 || beatIndex == 2) ? exp(-beatPhase * 7) : 0
+            let snare: Double = (beatIndex == 1 || beatIndex == 3) ? exp(-beatPhase * 8) * 0.8 : 0
+            let tambourineDrift: Double = 0.05 * sin(position * 2.3)
+            let tambourinePhase: Double = ((eighth + tambourineDrift) + 1).truncatingRemainder(dividingBy: 1)
+            let tambourine: Double = exp(-tambourinePhase * 14) * 0.32
+            let shimmer: Double = 0.5 + 0.5 * sin(position * 37.0)
+            let jangle: Double = 0.5 + 0.2 * sin(position * 5.3) * sin(position * 1.1) + 0.2 * shimmer
+            bass = (0.26 + 0.4 * kick + 0.1 * jangle) * energy
+            mid = (0.42 + 0.35 * jangle + 0.35 * snare) * energy
+            let highBody: Double = 0.14 + 0.2 * tambourine
+            high = (highBody + 0.15 * snare + 0.1 * jangle) * energy
+            centroid = 0.57 + 0.04 * chorus
+            let strumNoise: Double = 0.5 + 0.5 * sin(position * 23.0)
+            let drums: Double = kick * 0.6 + snare * 0.7 + tambourine * 0.35
+            transient = drums + 0.35 * jangle * strumNoise
         case .acousticClassical:
             // Gentle strums with accents and rubato, phrase swells every 2 bars, wide dynamics, no sub bass.
             let phrase = 0.25 + 0.75 * pow(sin(bar / 2 * .pi) * 0.5 + 0.5, 1.6)

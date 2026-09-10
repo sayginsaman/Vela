@@ -102,6 +102,7 @@ final class AppModel {
     @ObservationIgnored private var lastPointerReschedule: TimeInterval = 0
     @ObservationIgnored private var started = false
     @ObservationIgnored private let detector = ProfileDetector()
+    @ObservationIgnored private let latencyMonitor = OutputLatencyMonitor()
     @ObservationIgnored private var detectionTask: Task<Void, Never>?
     @ObservationIgnored private var trackGeneration = 0
     @ObservationIgnored private var reduceMotion = false
@@ -137,6 +138,8 @@ final class AppModel {
     /// Latest downsampled features for diagnostics (4 Hz, never per frame).
     private(set) var diagnostics: MusicFeatureSnapshot = .silent
     private(set) var previewProfile: VisualProfile?
+    /// Reported output-device latency and the device it belongs to.
+    private(set) var outputLatency: OutputLatencyMonitor.Reading = .none
 
     // MARK: UI state
     var isFullscreen = false
@@ -145,6 +148,9 @@ final class AppModel {
     var settingsVisible = false { didSet { if settingsVisible { cancelHide() } else { scheduleHide() } } }
     var showOnboarding: Bool
     private(set) var toast: String?
+    /// Brief title card shown when a new track starts.
+    private(set) var introVisible = false
+    @ObservationIgnored private var introTask: Task<Void, Never>?
 
     static var isRunningTests: Bool { NSClassFromString("XCTestCase") != nil }
 
@@ -206,6 +212,21 @@ final class AppModel {
         }
     }
 
+    /// Seconds added to the playback position when looking up lyrics.
+    var lyricTimeShift: TimeInterval {
+        LyricTiming.shift(userOffset: settings.lyricsOffset, outputLatency: outputLatency.latency, compensate: settings.compensateOutputLatency)
+    }
+
+    /// Moves the user timing offset by one step and reports the result.
+    func nudgeLyricsOffset(by delta: TimeInterval) {
+        let next = (settings.lyricsOffset + delta).rounded(toNearest: 0.05)
+        settings.lyricsOffset = min(max(next, VelaSettings.offsetRange.lowerBound), VelaSettings.offsetRange.upperBound)
+        let value = settings.lyricsOffset
+        let direction = abs(value) < 0.001 ? "neutral" : (value > 0 ? "earlier" : "later")
+        showToast("Lyrics \(TimeFormatting.offset(value)) · \(direction)")
+        showOverlay()
+    }
+
     /// The profile in force: a manual lock, otherwise Auto's detection (Pop until settled).
     var effectiveProfile: VisualProfile {
         ProfileResolver.resolve(selection: profileOverride ?? settings.visualProfile, detection: detection)
@@ -261,6 +282,13 @@ final class AppModel {
         }
         director.onPreviewEnded = { [weak self] in
             Task { @MainActor [weak self] in self?.previewProfile = nil }
+        }
+        outputLatency = latencyMonitor.reading
+        latencyMonitor.onChange = { [weak self] reading in
+            Task { @MainActor [weak self] in
+                self?.outputLatency = reading
+                VelaLog.app.info("output latency \(reading.latency, privacy: .public)s on \(reading.deviceName, privacy: .public)")
+            }
         }
         pushVisualInputs()
         startDetectionLoop()
@@ -379,6 +407,7 @@ final class AppModel {
         }
         pushVisualInputs()
         lyrics = .loading
+        showTrackIntro()
         artworkTask = Task { [weak self] in
             guard let self else { return }
             let image = try? await self.coordinator.artwork(for: newTrack)
@@ -483,6 +512,16 @@ final class AppModel {
         default: message = error.localizedDescription
         }
         showToast(message)
+    }
+
+    private func showTrackIntro() {
+        introTask?.cancel()
+        withAnimation(.easeOut(duration: 0.5)) { introVisible = true }
+        introTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4.5))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.8)) { self?.introVisible = false }
+        }
     }
 
     func showToast(_ message: String) {
@@ -609,6 +648,14 @@ final class AppModel {
         case 124: // Right
             guard !settingsVisible, capabilities.canSeek else { return false }
             seek(by: 5)
+            return true
+        case 33: // [
+            guard !settingsVisible else { return false }
+            nudgeLyricsOffset(by: -LyricTiming.nudgeStep)
+            return true
+        case 30: // ]
+            guard !settingsVisible else { return false }
+            nudgeLyricsOffset(by: LyricTiming.nudgeStep)
             return true
         default:
             return false

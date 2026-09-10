@@ -14,23 +14,26 @@ struct LyricMotionStyle: Equatable, Sendable {
     var lineDepth: Double
     var tempo: Double
     var reduceMotion: Bool
+    var typeface: LyricTypeface = .sans
 
     static let neutral = LyricMotionStyle(springResponse: 0.55, springDamping: 0.85, transitionDuration: 0.45,
                                           activeWordScale: 1.04, activeWordBloom: 0.55, wordPunch: 0, trackingShift: 0,
                                           lineDepth: 0.3, tempo: 1, reduceMotion: false)
 
     init(springResponse: Double, springDamping: Double, transitionDuration: Double, activeWordScale: Double,
-         activeWordBloom: Double, wordPunch: Double, trackingShift: Double, lineDepth: Double, tempo: Double, reduceMotion: Bool) {
+         activeWordBloom: Double, wordPunch: Double, trackingShift: Double, lineDepth: Double, tempo: Double, reduceMotion: Bool,
+         typeface: LyricTypeface = .sans) {
         self.springResponse = springResponse; self.springDamping = springDamping; self.transitionDuration = transitionDuration
         self.activeWordScale = activeWordScale; self.activeWordBloom = activeWordBloom; self.wordPunch = wordPunch
         self.trackingShift = trackingShift; self.lineDepth = lineDepth; self.tempo = tempo; self.reduceMotion = reduceMotion
+        self.typeface = typeface
     }
 
     init(preset: VisualProfilePreset, reduceMotion: Bool) {
         self.init(springResponse: preset.springResponse, springDamping: preset.springDamping,
                   transitionDuration: preset.transitionDuration, activeWordScale: preset.activeWordScale,
                   activeWordBloom: preset.activeWordBloom, wordPunch: preset.wordPunch, trackingShift: preset.trackingShift,
-                  lineDepth: preset.lineDepth, tempo: preset.tempo, reduceMotion: reduceMotion)
+                  lineDepth: preset.lineDepth, tempo: preset.tempo, reduceMotion: reduceMotion, typeface: preset.typeface)
     }
 
     var lineAnimation: Animation {

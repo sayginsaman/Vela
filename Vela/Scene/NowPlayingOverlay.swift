@@ -7,17 +7,24 @@ struct NowPlayingOverlay: View {
     var body: some View {
         HStack(spacing: 16) {
             ArtworkThumbnail(image: model.artwork, palette: model.palette)
-                .frame(width: 56, height: 56)
+                .frame(width: 62, height: 62)
+                .shadow(color: model.palette.glow.swiftUIColor.opacity(0.55), radius: 16, y: 4)
 
             VStack(alignment: .leading, spacing: 6) {
                 if let track = model.track {
                     Text(track.title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold)).kerning(-0.2)
                         .lineLimit(1)
-                    Text(track.artist.isEmpty ? track.album : track.artist)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(track.artist.isEmpty ? track.album : track.artist)
+                            .lineLimit(1)
+                        Text("·").foregroundStyle(.tertiary)
+                        Text(model.previewProfile.map { "Preview: \($0.displayName)" } ?? model.effectiveProfile.displayName)
+                            .foregroundStyle(model.palette.highlight.swiftUIColor.opacity(0.9))
+                            .lineLimit(1)
+                    }
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
                 } else {
                     Text(placeholderTitle)
                         .font(.system(size: 15, weight: .semibold))
@@ -28,6 +35,10 @@ struct NowPlayingOverlay: View {
                 ProgressBar()
             }
             .frame(minWidth: 220, maxWidth: 360)
+
+            LevelMeter()
+                .frame(width: 22, height: 26)
+                .opacity(model.isPlaying ? 1 : 0.25)
 
             HStack(spacing: 4) {
                 Button { model.previous() } label: { Image(systemName: "backward.fill").font(.system(size: 15, weight: .semibold)) }
@@ -68,7 +79,9 @@ struct NowPlayingOverlay: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.black.opacity(model.reduceTransparency ? 0.9 : 0.28)))
-                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.white.opacity(0.1)))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(LinearGradient(colors: [model.palette.highlight.swiftUIColor.opacity(0.35), Color.white.opacity(0.08), model.palette.glow.swiftUIColor.opacity(0.3)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1))
                 .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         )
         .environment(\.colorScheme, .dark)
@@ -169,5 +182,30 @@ private struct ProgressBar: View {
             .accessibilityLabel("Progress")
             .accessibilityValue("\(TimeFormatting.clock(position)) of \(TimeFormatting.clock(duration))")
         }
+    }
+}
+
+
+/// Three tiny bars (bass, mids, highs) driven by the director's smoothed bands: a live signal,
+/// never decoration.
+private struct LevelMeter: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / 15)) { _ in
+            let bands = model.director.lastState.bands
+            let values = [Double(bands.bass), Double(bands.mid), Double(bands.high)]
+            let colors = [model.palette.highlight, model.palette.glow, model.palette.primary].map(\.swiftUIColor)
+            HStack(alignment: .bottom, spacing: 3) {
+                ForEach(0..<3, id: \.self) { index in
+                    Capsule()
+                        .fill(colors[index].opacity(0.9))
+                        .frame(width: 4, height: 4 + 20 * values[index])
+                        .animation(.easeOut(duration: 0.12), value: values[index])
+                }
+            }
+            .frame(maxHeight: .infinity, alignment: .bottom)
+        }
+        .accessibilityHidden(true)
     }
 }

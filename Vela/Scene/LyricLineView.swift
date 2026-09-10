@@ -43,6 +43,8 @@ struct LyricLineView: View {
         }
         .environment(\.layoutDirection, .leftToRight)
         .frame(maxWidth: maxWidth)
+        // A soft drop shadow lifts the sung line off bright artwork.
+        .shadow(color: .black.opacity(role == .current && !typography.reduceEffects ? 0.32 : 0), radius: 16, y: 8)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(role == .current ? "Current line: \(line.text)" : line.text)
     }

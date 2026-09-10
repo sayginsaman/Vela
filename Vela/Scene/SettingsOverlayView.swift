@@ -103,6 +103,12 @@ struct SettingsOverlayView: View {
         }
     }
 
+    private var latencyText: String {
+        let reading = self.model.outputLatency
+        guard !reading.deviceName.isEmpty else { return "No output device reported." }
+        return String(format: "%@ reports %.0f ms of output delay; lyrics are shifted to match when enabled.", reading.deviceName, reading.latency * 1000)
+    }
+
     private var profileStatusText: String {
         let d = self.model.detection
         let detected: String
@@ -133,6 +139,8 @@ struct SettingsOverlayView: View {
             ("Dynamic range", String(format: "%.2f", f.dynamicRange)),
             ("Loudness", String(format: "%.2f", f.averageLoudness)),
             ("Rhythmic regularity", String(format: "%.2f", f.rhythmicRegularity)),
+            ("Output latency", String(format: "%.0f ms · %@", self.model.outputLatency.latency * 1000, self.model.outputLatency.deviceName.isEmpty ? "—" : self.model.outputLatency.deviceName)),
+            ("Lyric time shift", String(format: "%+.2f s", self.model.lyricTimeShift)),
         ]
         return Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
             ForEach(rows, id: \.0) { row in
@@ -183,7 +191,9 @@ struct SettingsOverlayView: View {
             SliderRow(title: "Size", value: model.settings.lyricSize, range: VelaSettings.lyricSizeRange, format: { String(format: "%.0f%%", $0 * 100) })
             SliderRow(title: "Timing offset", value: model.settings.lyricsOffset, range: VelaSettings.offsetRange, step: 0.1,
                       format: { TimeFormatting.offset($0) }, reset: { self.model.settings.lyricsOffset = 0 })
-            Text("Negative shows lyrics later, positive earlier.").font(.system(size: 11)).foregroundStyle(.secondary)
+            Text("Negative shows lyrics later, positive earlier. Press [ or ] any time to nudge by 0.1 s.").font(.system(size: 11)).foregroundStyle(.secondary)
+            Toggle("Compensate for output latency", isOn: model.settings.compensateOutputLatency)
+            Text(latencyText).font(.system(size: 11)).foregroundStyle(.tertiary)
             HStack {
                 Button("Import .lrc for this track…") { self.model.importLyricsFile() }
                     .disabled(self.model.track == nil)
