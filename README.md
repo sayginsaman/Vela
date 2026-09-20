@@ -93,6 +93,10 @@ player state still shows and the light breathes on its own.
 
 Requires macOS 14 or later on Apple Silicon.
 
+Vela keeps itself current: it checks for a new release once a day (or on demand from the app
+menu › Check for Updates…), downloads it, verifies the signature, and installs it when you
+relaunch. Automatic checks can be turned off in Settings › Updates.
+
 ## Using it
 
 **Full screen** is the whole point. Press ⌘F, or use the button in the controls bar. Escape
@@ -164,12 +168,16 @@ xcodebuild -project Vela.xcodeproj -scheme Vela -configuration Debug build
 xcodebuild -project Vela.xcodeproj -scheme Vela -configuration Debug test
 ```
 
-Xcode 16 or later; the project uses synchronized folder groups. The Metal shaders are compiled
+Xcode 16 or later; the project uses synchronized folder groups. The only dependency is
+[Sparkle](https://sparkle-project.org) (Swift Package Manager), which handles in-app updates. The Metal shaders are compiled
 at runtime from source, so the Metal toolchain does not need to be installed. Local builds sign
 ad hoc, which means macOS asks for the privacy permissions again after every rebuild; set your
 team in Signing & Capabilities to avoid that. Release builds come from `scripts/release.sh`,
 which signs with a Developer ID Application certificate, notarizes, staples and packages the
-disk image (the one-time setup is described at the top of the script).
+disk image, then signs the image with the Sparkle EdDSA key and appends it to `appcast.xml`
+(the one-time setup is described at the top of the script). Publishing a release is: run the
+script, create the GitHub release with the disk image, commit and push the updated appcast.
+Existing installs pick it up on their next check.
 
 ### Architecture
 

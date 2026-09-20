@@ -23,6 +23,7 @@ struct SettingsOverlayView: View {
                         playbackSection(model: $model)
                         demoSection
                         permissionsSection
+                        updatesSection
                         footer
                     }
                     .padding(22)
@@ -286,6 +287,40 @@ struct SettingsOverlayView: View {
                 }
             }
         }
+    }
+
+    private var updatesSection: some View {
+        SettingsSection(title: "Updates") {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Vela \(self.model.updates.currentVersion)").font(.system(size: 12, weight: .semibold))
+                    Text(updatesStatusText).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Check now") { self.model.updates.checkForUpdates() }
+                    .controlSize(.small)
+                    .disabled(!self.model.updates.canCheck)
+            }
+            Toggle("Check for updates automatically", isOn: Binding(
+                get: { self.model.updates.automaticChecks },
+                set: { self.model.updates.automaticChecks = $0 }))
+                .disabled(!self.model.updates.isAvailable)
+            Text("Updates are downloaded from GitHub, verified against Vela's signing key, and installed when you relaunch.")
+                .font(.system(size: 11)).foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var updatesStatusText: String {
+        let u = self.model.updates
+        guard u.isAvailable else { return "Updates are unavailable in this build." }
+        if let error = u.lastError { return error }
+        if let date = u.lastCheck {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.unitsStyle = .full
+            return "Last checked \(formatter.localizedString(for: date, relativeTo: Date()))."
+        }
+        return "Not checked yet."
     }
 
     private var footer: some View {

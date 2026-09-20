@@ -17,6 +17,10 @@ struct VelaApp: App {
                 Button("Settings…") { model.toggleSettings() }
                     .keyboardShortcut(",", modifiers: .command)
             }
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { model.updates.checkForUpdates() }
+                    .disabled(!model.updates.canCheck)
+            }
             CommandGroup(replacing: .newItem) {}
             CommandMenu("Playback") {
                 Button(model.clock.isRunning ? "Pause" : "Play") { model.togglePlayPause() }

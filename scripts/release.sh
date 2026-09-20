@@ -4,6 +4,8 @@
 #   scripts/release.sh <version> [notary-keychain-profile]
 #
 # Prerequisites (one-time, done by the account owner):
+#   0. Sparkle's EdDSA key in the login keychain (build/DerivedData/SourcePackages/artifacts/
+#      sparkle/Sparkle/bin/generate_keys). Its public half lives in Config/Info.plist.
 #   1. A "Developer ID Application" certificate in the login keychain
 #      (Xcode › Settings › Accounts › Manage Certificates › + › Developer ID Application).
 #   2. Notary credentials stored in the keychain, never in this repo:
@@ -26,6 +28,8 @@ VERSION=${1:?usage: scripts/release.sh <version> [profile]}
 PROFILE=${2:-VelaNotary}
 cd "$(dirname "$0")/.."
 
+SPARKLE_PUBLIC_ED_KEY=$(build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -p 2>/dev/null | tail -1)
+[[ -n "$SPARKLE_PUBLIC_ED_KEY" ]] || { echo "No Sparkle key in the keychain; run generate_keys once."; exit 1; }
 IDENTITY=$(security find-identity -v -p codesigning | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')
 [[ -n "$IDENTITY" ]] || { echo "No Developer ID Application certificate in the keychain."; exit 1; }
 TEAM=$(echo "$IDENTITY" | sed -E 's/.*\(([A-Z0-9]+)\)$/\1/')
@@ -63,3 +67,12 @@ xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
 staple "$DMG"
 spctl -a -t open --context context:primary-signature -v "$DMG"
 echo "✓ $DMG is signed, notarized and stapled"
+
+echo "▶ Signing for in-app updates"
+SPARKLE_BIN=$(ls -d build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin 2>/dev/null | head -1)
+[[ -n "$SPARKLE_BIN" ]] || { echo "Sparkle tools not found; resolve packages first."; exit 1; }
+ED_SIGNATURE=$("$SPARKLE_BIN/sign_update" -p "$DMG")
+BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP/Contents/Info.plist")
+scripts/appcast.py "$VERSION" "$BUILD_NUMBER" "$DMG" \
+  "https://github.com/sayginsaman/Vela/releases/download/v$VERSION/Vela-$VERSION.dmg" "$ED_SIGNATURE"
+echo "✓ appcast.xml updated — commit and push it after publishing the GitHub release"

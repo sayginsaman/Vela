@@ -117,6 +117,8 @@ final class AppModel {
     let windowController = WindowController()
     /// Produces the smoothed per-frame visual state for the renderers.
     let director = VisualDirector()
+    /// Sparkle-backed in-app updates.
+    let updates = UpdateController()
 
     @ObservationIgnored private let demoSource: DemoMusicSource
     @ObservationIgnored private let coordinator: MusicSourceCoordinator
