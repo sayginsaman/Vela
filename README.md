@@ -78,7 +78,8 @@ Everything lives in one translucent panel over the scene: the visual profile, fo
 how strongly the scene reacts (overall, background, edge light, lyric motion), particles, a
 gentler-motion toggle, a ten-second preview of any profile without touching playback, an
 Analysis disclosure that shows what the detector is currently hearing, the lyric layout (centred
-or split), your own Musixmatch key, and local alignment.
+or split), where the elements sit and how big they are, your own Musixmatch key, and local
+alignment.
 
 ## Install
 
@@ -122,13 +123,26 @@ bar, previous / play-pause / next, full screen and Settings.
 | [ / ] | Nudge lyrics later / earlier by 0.1 s |
 | Esc | Close Settings, then leave full screen |
 
-**Layouts.** *Centered* puts the lyrics alone in the middle of the screen. *Split* moves them to
-the right and gives the left third to the track: large artwork, title, artist, album and a
-scrubbable progress bar, all permanently on screen. Either layout works with any lyric style, and
-a window too narrow for two columns quietly falls back to centred.
+**Layouts.** *Centered* puts the lyrics alone in the middle of the screen. *Split* sets the track
+beside them: large artwork, title, artist, album and a scrubbable progress bar in one column, the
+lyrics in the other. The two columns are sized for reading rather than stretched to the window,
+and they sit in the middle of it as a pair, so a wide display pads both sides instead of pushing
+the words into a corner. Either layout works with any lyric style, and a window too narrow for two
+columns quietly falls back to centred.
 
 <div align="center">
 <img src="docs/screenshots/split-layout.png" width="820" alt="Split layout: album artwork, track title, artist and progress on the left, word-by-word lyrics running down the right">
+</div>
+
+**Moving things around.** Settings › Position & size has a size, a horizontal and a vertical
+slider for the lyrics and for the music panel. *Resize / Reposition* closes Settings and hands the
+scene itself drag handles: pull an element to move it, pull the corner to resize it, and the
+composition updates live behind the outlines. Positions are stored as a share of the window, so
+resizing Vela or moving it to another display keeps the arrangement in proportion. *Reset* puts
+both elements back.
+
+<div align="center">
+<img src="docs/screenshots/arrange.png" width="820" alt="Arrange mode: dashed outlines around the music panel and the lyric column, each with a corner resize handle, and a toolbar explaining the gestures">
 </div>
 
 **Lyric styles.** *Stack* is the default: one word per row, the word being sung large in the
@@ -295,7 +309,7 @@ A few environment variables make the app scriptable for checks and screenshots:
 | `VELA_ALWAYS_RENDER=1` | Keep the Metal scene rendering while the window is occluded |
 | `VELA_SCREENSHOT_PATH=/path.png` | Save the window to disk after `VELA_SCREENSHOT_DELAY` seconds |
 | `VELA_WINDOW_SIZE=1600x900` | Size the window before a capture |
-| `VELA_SCREENSHOT_SETTINGS=1`, `VELA_SCREENSHOT_ONBOARDING=1` | Show those layers in the capture |
+| `VELA_SCREENSHOT_SETTINGS=1`, `VELA_SCREENSHOT_ONBOARDING=1`, `VELA_SCREENSHOT_ARRANGE=1` | Show those layers in the capture |
 
 The README images were produced this way from Demo Mode.
 

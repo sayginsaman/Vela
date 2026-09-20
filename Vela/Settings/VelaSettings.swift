@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 enum LyricStyle: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -67,6 +68,31 @@ enum PreferredSource: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 /// Everything the user can change. Persisted as one JSON blob by `SettingsStore`.
+/// How far an element has been nudged from its natural place, and how much it has been resized.
+/// Offsets are fractions of the stage so a window resize keeps the composition proportional.
+struct SceneArrangement: Codable, Equatable, Sendable {
+    var scale: Double = 1
+    var offsetX: Double = 0
+    var offsetY: Double = 0
+
+    static let scaleRange: ClosedRange<Double> = 0.6...1.5
+    static let offsetRange: ClosedRange<Double> = -0.4...0.4
+
+    static let identity = SceneArrangement()
+    var isIdentity: Bool { self == .identity }
+
+    func clamped() -> SceneArrangement {
+        SceneArrangement(scale: min(max(scale, Self.scaleRange.lowerBound), Self.scaleRange.upperBound),
+                         offsetX: min(max(offsetX, Self.offsetRange.lowerBound), Self.offsetRange.upperBound),
+                         offsetY: min(max(offsetY, Self.offsetRange.lowerBound), Self.offsetRange.upperBound))
+    }
+
+    /// The point offset for a stage of this size.
+    func translation(in size: CGSize) -> CGSize {
+        CGSize(width: offsetX * size.width, height: offsetY * size.height)
+    }
+}
+
 struct VelaSettings: Codable, Equatable, Sendable {
     var paletteMode: PaletteMode = .automatic
     var manualHighlight: RGBColor = Palette.fallback.highlight
@@ -109,6 +135,10 @@ struct VelaSettings: Codable, Equatable, Sendable {
     var compensateOutputLatency: Bool = true
     /// Listen to the song and pin lyric words to what is actually sung.
     var localAlignment: Bool = false
+    /// Where the lyric column sits and how big it is.
+    var lyricArrangement = SceneArrangement()
+    /// Where the now-playing panel sits and how big it is, in the split layout.
+    var panelArrangement = SceneArrangement()
 
     static let reactionRange: ClosedRange<Double> = 0...1.5
 
@@ -151,6 +181,8 @@ struct VelaSettings: Codable, Equatable, Sendable {
         reduceIntenseMotion = try c.decodeIfPresent(Bool.self, forKey: .reduceIntenseMotion) ?? base.reduceIntenseMotion
         compensateOutputLatency = try c.decodeIfPresent(Bool.self, forKey: .compensateOutputLatency) ?? base.compensateOutputLatency
         localAlignment = try c.decodeIfPresent(Bool.self, forKey: .localAlignment) ?? base.localAlignment
+        lyricArrangement = try c.decodeIfPresent(SceneArrangement.self, forKey: .lyricArrangement) ?? base.lyricArrangement
+        panelArrangement = try c.decodeIfPresent(SceneArrangement.self, forKey: .panelArrangement) ?? base.panelArrangement
     }
 
     static let lyricSizeRange: ClosedRange<Double> = 0.7...1.6
@@ -167,6 +199,8 @@ struct VelaSettings: Codable, Equatable, Sendable {
         copy.glowIntensity = min(max(glowIntensity, Self.glowIntensityRange.lowerBound), Self.glowIntensityRange.upperBound)
         copy.glowSpread = min(max(glowSpread, Self.glowSpreadRange.lowerBound), Self.glowSpreadRange.upperBound)
         copy.lyricsOffset = min(max(lyricsOffset, Self.offsetRange.lowerBound), Self.offsetRange.upperBound)
+        copy.lyricArrangement = lyricArrangement.clamped()
+        copy.panelArrangement = panelArrangement.clamped()
         copy.reactiveIntensity = min(max(reactiveIntensity, Self.reactionRange.lowerBound), Self.reactionRange.upperBound)
         copy.backgroundReaction = min(max(backgroundReaction, Self.reactionRange.lowerBound), Self.reactionRange.upperBound)
         copy.edgeReaction = min(max(edgeReaction, Self.reactionRange.lowerBound), Self.reactionRange.upperBound)

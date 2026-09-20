@@ -20,6 +20,7 @@ struct SettingsOverlayView: View {
                     VStack(alignment: .leading, spacing: 22) {
                         visualProfileSection(model: $model)
                         lyricsSection(model: $model)
+                        arrangeSection(model: $model)
                         lightSection(model: $model)
                         playbackSection(model: $model)
                         demoSection
@@ -216,6 +217,31 @@ struct SettingsOverlayView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+        }
+    }
+
+    private func arrangeSection(model: Bindable<AppModel>) -> some View {
+        SettingsSection(title: "Position & size") {
+            Text("Move the lyrics and the music panel, or change how big they are. Both positions are kept as a share of the window, so the composition holds together when you resize Vela.")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Resize / Reposition…") { self.model.beginArrangingScene() }
+                    .buttonStyle(.borderedProminent)
+                Button("Reset") { self.model.resetArrangement() }
+                    .buttonStyle(.bordered)
+                    .disabled(self.model.settings.lyricArrangement.isIdentity && self.model.settings.panelArrangement.isIdentity)
+            }
+            .controlSize(.small)
+            Text("Closes Settings and lets you drag the elements on the scene itself.")
+                .font(.system(size: 11)).foregroundStyle(.tertiary)
+
+            Text("Lyrics").font(.system(size: 11, weight: .semibold)).padding(.top, 4)
+            ArrangementRows(arrangement: model.settings.lyricArrangement)
+            if self.model.settings.sceneLayout == .split {
+                Text("Music panel").font(.system(size: 11, weight: .semibold)).padding(.top, 4)
+                ArrangementRows(arrangement: model.settings.panelArrangement)
+            }
         }
     }
 
@@ -437,6 +463,20 @@ private struct SettingsSection<Content: View>: View {
                 .foregroundStyle(.secondary)
             content()
         }
+    }
+}
+
+/// The three sliders that describe where an element sits and how big it is.
+private struct ArrangementRows: View {
+    @Binding var arrangement: SceneArrangement
+
+    var body: some View {
+        SliderRow(title: "Size", value: $arrangement.scale, range: SceneArrangement.scaleRange,
+                  format: { String(format: "%.0f%%", $0 * 100) }, reset: { arrangement.scale = 1 })
+        SliderRow(title: "Horizontal", value: $arrangement.offsetX, range: SceneArrangement.offsetRange,
+                  format: { String(format: "%+.0f%%", $0 * 100) }, reset: { arrangement.offsetX = 0 })
+        SliderRow(title: "Vertical", value: $arrangement.offsetY, range: SceneArrangement.offsetRange,
+                  format: { String(format: "%+.0f%%", $0 * 100) }, reset: { arrangement.offsetY = 0 })
     }
 }
 

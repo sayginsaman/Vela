@@ -188,6 +188,8 @@ final class AppModel {
     private(set) var overlayVisible = true
     private(set) var overlayHovering = false
     var settingsVisible = false { didSet { if settingsVisible { cancelHide() } else { scheduleHide() } } }
+    /// Direct manipulation of the scene: the elements gain drag handles until this is turned off.
+    private(set) var isArrangingScene = false
     var showOnboarding: Bool
     private(set) var toast: String?
     /// Brief title card shown when a new track starts.
@@ -341,7 +343,8 @@ final class AppModel {
         startDetectionLoop()
         if isDemoMode { Task { await demoSource.setEnabled(true) } }
         // Developer hooks: `VELA_DEMO_TRACK=<catalogue id>` starts straight into that demo fixture;
-        // `VELA_SCREENSHOT_SETTINGS=1` / `VELA_SCREENSHOT_ONBOARDING=1` show those layers for captures.
+        // `VELA_SCREENSHOT_SETTINGS=1` / `VELA_SCREENSHOT_ONBOARDING=1` / `VELA_SCREENSHOT_ARRANGE=1`
+        // show those layers for captures.
         let env = ProcessInfo.processInfo.environment
         if let requested = env["VELA_DEMO_TRACK"], DemoCatalog.track(withID: requested) != nil {
             selectDemoTrack(id: requested)
@@ -352,11 +355,12 @@ final class AppModel {
             if let layout = env["VELA_LAYOUT"].flatMap(SceneLayout.init(rawValue:)) { settings.sceneLayout = layout }
             if let style = env["VELA_LYRIC_STYLE"].flatMap(LyricStyle.init(rawValue:)) { settings.lyricStyle = style }
             showOnboarding = env["VELA_SCREENSHOT_ONBOARDING"] == "1"
-            if env["VELA_SCREENSHOT_SETTINGS"] == "1" {
+            if env["VELA_SCREENSHOT_SETTINGS"] == "1" || env["VELA_SCREENSHOT_ARRANGE"] == "1" {
+                let arranging = env["VELA_SCREENSHOT_ARRANGE"] == "1"
                 let delay = max(0.5, (Double(env["VELA_SCREENSHOT_DELAY"] ?? "") ?? 20) - 1.5)
                 Task { @MainActor [weak self] in
                     try? await Task.sleep(for: .seconds(delay))
-                    self?.settingsVisible = true
+                    if arranging { self?.beginArrangingScene() } else { self?.settingsVisible = true }
                 }
             }
         }
@@ -502,6 +506,23 @@ final class AppModel {
         guard case .ready = lyrics else { return }
         lyrics = .ready(LyricTimelineBox(document: document))
         VelaLog.lyrics.info("alignment refined \(document.provenance, privacy: .public)")
+    }
+
+    /// Leaves Settings and hands the scene its drag handles.
+    func beginArrangingScene() {
+        settingsVisible = false
+        isArrangingScene = true
+        showOverlay()
+    }
+
+    func endArrangingScene() {
+        isArrangingScene = false
+    }
+
+    /// Puts both elements back where the layout would have placed them.
+    func resetArrangement() {
+        settings.lyricArrangement = .identity
+        settings.panelArrangement = .identity
     }
 
     /// Whether the user has granted speech recognition, which local alignment needs.

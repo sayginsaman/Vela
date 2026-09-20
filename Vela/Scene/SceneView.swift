@@ -7,7 +7,8 @@ struct SceneView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let layout = StageLayout(size: proxy.size, split: model.settings.sceneLayout == .split && model.track != nil)
+            let layout = StageLayout(size: proxy.size, split: model.settings.sceneLayout == .split && model.track != nil,
+                                     lyric: model.settings.lyricArrangement, panel: model.settings.panelArrangement)
             let typography = typography(for: layout)
             ZStack {
                 ReactiveSceneView(director: model.director, features: model.audio.store,
@@ -19,24 +20,31 @@ struct SceneView: View {
                     Color.black.opacity(0.28).ignoresSafeArea()
                 }
 
-                HStack(spacing: 0) {
+                // The columns are laid out at their natural size and centred as a group, so a wide
+                // window pads both sides instead of stranding the words against the left edge.
+                HStack(spacing: layout.gap) {
                     if layout.isSplit {
-                        NowPlayingPanel(width: layout.panelWidth, height: proxy.size.height)
-                            .frame(width: layout.panelWidth, height: proxy.size.height)
-                            // A background never affects layout, so the scrim can spill past the
-                            // panel to feather out without dragging the panel off the edge.
-                            .background(alignment: .leading) { panelScrim(width: layout.panelWidth) }
-                            .transition(.move(edge: .leading).combined(with: .opacity))
+                        ArrangeableElement(title: "Music", stageSize: proxy.size, naturalWidth: layout.panelWidth,
+                                           isArranging: model.isArrangingScene,
+                                           arrangement: Bindable(model).settings.panelArrangement) {
+                            NowPlayingPanel(width: layout.panelWidth, height: panelHeight(layout))
+                                .frame(width: layout.panelWidth, height: panelHeight(layout))
+                                // A background never affects layout, so the scrim can feather out
+                                // past the panel without dragging the panel off its place.
+                                .background { panelScrim(width: layout.panelWidth, height: panelHeight(layout)) }
+                        }
+                        .transition(.move(edge: .leading).combined(with: .opacity))
                     }
-                    stage(typography: typography, layout: layout)
-                        // Padding inside the fixed width: outside it the row would overflow the
-                        // window and SwiftUI would centre the overflow, shifting both columns.
-                        .padding(.leading, layout.isSplit ? 36 : 0)
-                        .padding(.trailing, layout.isSplit ? 44 : 0)
-                        .frame(width: layout.lyricWidth, height: proxy.size.height)
-                        .id(model.transitionID)
-                        .transition(.opacity)
-                        .animation(.easeInOut(duration: 0.7), value: model.transitionID)
+                    ArrangeableElement(title: "Lyrics", stageSize: proxy.size, naturalWidth: layout.lyricWidth,
+                                       isArranging: model.isArrangingScene,
+                                       arrangement: Bindable(model).settings.lyricArrangement,
+                                       verticalInset: 86) {
+                        stage(typography: typography, layout: layout)
+                            .frame(width: layout.lyricWidth, height: proxy.size.height)
+                            .id(model.transitionID)
+                            .transition(.opacity)
+                            .animation(.easeInOut(duration: 0.7), value: model.transitionID)
+                    }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
 
@@ -55,21 +63,22 @@ struct SceneView: View {
 
     /// Darkens the left edge just enough for the panel to read over busy artwork, feathering out
     /// past the panel so there is never a visible seam against the lyrics.
-    private func panelScrim(width: CGFloat) -> some View {
-        LinearGradient(colors: [Color.black.opacity(model.reduceTransparency ? 0.85 : 0.52),
-                                Color.black.opacity(model.reduceTransparency ? 0.7 : 0.34),
-                                .clear],
-                       startPoint: .leading, endPoint: .trailing)
-            .frame(width: width * 1.45)
+    private func panelScrim(width: CGFloat, height: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 56, style: .continuous)
+            .fill(Color.black.opacity(model.reduceTransparency ? 0.6 : 0.3))
+            .frame(width: width * 1.2, height: height * 1.04)
+            .blur(radius: 42)
             .allowsHitTesting(false)
     }
 
+    /// The panel only needs the height its contents occupy; a full-height column would put its
+    /// drag outline around empty space in arrange mode.
+    private func panelHeight(_ layout: StageLayout) -> CGFloat {
+        min(layout.size.height - 150, layout.panelWidth * 1.9)
+    }
+
     private func typography(for layout: StageLayout) -> LyricTypography {
-        // The split column is narrower and the words are left-aligned, so they need a little
-        // less size to carry the same weight.
-        let base = layout.isSplit
-            ? min(layout.lyricWidth * 0.044, layout.size.height * 0.062)
-            : min(layout.lyricWidth * 0.052, layout.size.height * 0.075)
+        let base = layout.typographyBase
         return LyricTypography(fontSize: max(22, base * model.settings.lyricSize),
                                style: model.settings.lyricStyle,
                                palette: model.palette,
@@ -183,7 +192,7 @@ struct SceneView: View {
                 .padding(.top, model.isFullscreen ? 18 : 34)
                 .padding(.leading, 20)
                 Spacer()
-                if model.overlayVisible {
+                if model.overlayVisible, !model.isArrangingScene {
                     NowPlayingOverlay()
                         .padding(.bottom, 28)
                         .transition(.opacity.combined(with: .offset(y: 12)))
@@ -201,7 +210,7 @@ struct SceneView: View {
             .allowsHitTesting(false)
             .animation(.easeInOut(duration: 0.5), value: model.overlayVisible)
 
-            if model.introVisible, !model.overlayVisible, let track = model.track {
+            if model.introVisible, !model.overlayVisible, !model.isArrangingScene, let track = model.track {
                 VStack {
                     Spacer()
                     HStack {
@@ -227,12 +236,21 @@ struct SceneView: View {
                 .transition(.opacity)
             }
 
+            if model.isArrangingScene {
+                VStack {
+                    Spacer()
+                    ArrangeToolbar().padding(.bottom, 18)
+                }
+                .transition(.opacity.combined(with: .offset(y: 16)))
+            }
+
             if model.settingsVisible {
                 SettingsOverlayView()
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.settingsVisible)
+        .animation(.easeInOut(duration: 0.3), value: model.isArrangingScene)
         .animation(.easeInOut(duration: 0.3), value: model.toast)
         .animation(.easeInOut(duration: 0.6), value: model.introVisible)
     }
@@ -301,17 +319,47 @@ struct StageLayout: Equatable {
     var size: CGSize
     var isSplit: Bool
     var panelWidth: CGFloat
+    var lyricWidth: CGFloat
+    /// Space between the panel and the lyrics.
+    var gap: CGFloat
+    /// The width the columns occupy together, which the stage centres.
+    var contentWidth: CGFloat
 
     static let minimumWidthForSplit: CGFloat = 860
+    /// Past this the lyric column stops growing: a line of text much wider than this stops
+    /// being readable, and on a wide display the words would drift away from the artwork.
+    static let maximumLyricWidth: CGFloat = 860
+    static let naturalPanelWidth: ClosedRange<CGFloat> = 280...400
 
-    init(size: CGSize, split: Bool) {
+    init(size: CGSize, split: Bool, lyric: SceneArrangement = .identity, panel: SceneArrangement = .identity) {
         self.size = size
         isSplit = split && size.width >= Self.minimumWidthForSplit
-        panelWidth = isSplit ? max(300, min(430, size.width * 0.31)) : 0
+        guard isSplit else {
+            panelWidth = 0
+            gap = 0
+            lyricWidth = size.width
+            contentWidth = size.width
+            return
+        }
+        let natural = min(max(size.width * 0.26, Self.naturalPanelWidth.lowerBound), Self.naturalPanelWidth.upperBound)
+        panelWidth = natural * panel.scale
+        gap = 48
+        let room = max(240, size.width - panelWidth - gap - 48)
+        let wanted = min(Self.maximumLyricWidth, max(420, size.width * 0.42)) * lyric.scale
+        lyricWidth = min(room, wanted)
+        contentWidth = panelWidth + gap + lyricWidth
     }
 
-    var lyricWidth: CGFloat { max(0, size.width - panelWidth) }
+    /// Both columns together, centred in the stage, rather than pinned to its edges.
+    var leadingInset: CGFloat { max(0, (size.width - contentWidth) / 2) }
     var alignment: LyricAlignment { isSplit ? .leading : .center }
+
+    /// Text is sized from the column it lives in, so the split column needs a larger factor than
+    /// the full-width centred stage to end up at a comparable size.
+    var typographyBase: CGFloat {
+        isSplit ? min(lyricWidth * 0.062, size.height * 0.065)
+                : min(lyricWidth * 0.052, size.height * 0.075)
+    }
 }
 
 /// Small pill in the top-left naming the source and lyric timing quality.
