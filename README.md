@@ -121,6 +121,15 @@ bar, previous / play-pause / next, full screen and Settings.
 | [ / ] | Nudge lyrics later / earlier by 0.1 s |
 | Esc | Close Settings, then leave full screen |
 
+**Layouts.** *Centered* puts the lyrics alone in the middle of the screen. *Split* moves them to
+the right and gives the left third to the track: large artwork, title, artist, album and a
+scrubbable progress bar, all permanently on screen. Either layout works with any lyric style, and
+a window too narrow for two columns quietly falls back to centred.
+
+<div align="center">
+<img src="docs/screenshots/split-layout.png" width="820" alt="Split layout: album artwork, track title, artist and progress on the left, word-by-word lyrics running down the right">
+</div>
+
 **Lyric styles.** *Stack* is the default: one word per row, the word being sung large in the
 centre with a filled tag that sweeps across it, the words just sung shrinking and receding
 above, the next ones waiting below. The column advances word by word, so a fast verse flows
@@ -240,11 +249,16 @@ confident contradiction. Genre metadata short-circuits all of this.
 Timing is honest end to end: a `LyricDocument` carries a `TimingQuality` (word-synced,
 line-synced, estimated, unsynced) and every `TimedWord` records whether its timestamps were
 estimated. Providers are consulted in order: an imported `.lrc` file, the bundled demo lyrics,
-the disk cache, then AMLL, then LRCLIB. AMLL is a community database of word-by-word (really
+the disk cache, then AMLL, then Musixmatch if you supplied a key, then LRCLIB. AMLL is a community database of word-by-word (really
 syllable-by-syllable) lyrics released under CC0, read straight from its public repository with no
 key; tracks are matched on Spotify's own track id where we have one, otherwise on title and
 artist together. It covers a few thousand songs rather than everything, so when it misses, LRCLIB
-answers and nothing is lost. LRCLIB returns line-level timing, so its words are estimated by length and punctuation;
+answers and nothing is lost.
+
+Vela ships no Musixmatch key, because word-by-word ("richsync") access is a commercial plan and a
+key embedded in an open-source app would be everybody's key. Anyone with their own key can paste
+it into Settings, under Word-by-word lyrics, where it is kept in the login keychain, checked on
+the spot, and used only for their own lookups. LRCLIB returns line-level timing, so its words are estimated by length and punctuation;
 enhanced LRC files (`<mm:ss.xx>` tags) are used verbatim. Plain lyrics fall back to a slowly
 scrolling unsynced mode.
 
@@ -270,6 +284,8 @@ The README images were produced this way from Demo Mode.
   system-wide". Other players show the "Nothing playing" state.
 - AMLL carries true word-level timing but only for a few thousand songs, weighted towards
   Japanese and Chinese releases, so most Western tracks still fall through to LRCLIB.
+- The Musixmatch provider is inert without a key, and its live path has only been exercised
+  against the documented response shape, not a paid account.
 - LRCLIB is a community database. Coverage is good but not universal; lyrics are line-synced,
   never word-synced. The provider boundary (`LyricsProvider`) is ready for a word-level provider
   should one be added; no keys or paid services are used.
