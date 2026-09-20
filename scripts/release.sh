@@ -43,7 +43,27 @@ xcodebuild -project Vela.xcodeproj -scheme Vela -configuration Release -derivedD
   build | grep -E "error:|warning: .*sign|BUILD" || true
 
 APP=build/DerivedData/Build/Products/Release/Vela.app
+
+# Xcode re-signs only the outer Sparkle framework; its nested helpers keep Sparkle's own
+# signature, which notarization rejects. Re-sign them inside-out with our identity, hardened
+# runtime and a timestamp, keeping the XPC services' entitlements.
+SPARKLE_FW="$APP/Contents/Frameworks/Sparkle.framework"
+if [[ -d "$SPARKLE_FW" ]]; then
+  echo "▶ Re-signing Sparkle helpers"
+  V="$SPARKLE_FW/Versions/B"
+  for xpc in "$V/XPCServices/Installer.xpc" "$V/XPCServices/Downloader.xpc"; do
+    [[ -d "$xpc" ]] && codesign -f -s "$IDENTITY" -o runtime --timestamp --preserve-metadata=entitlements "$xpc"
+  done
+  codesign -f -s "$IDENTITY" -o runtime --timestamp "$V/Autoupdate"
+  codesign -f -s "$IDENTITY" -o runtime --timestamp "$V/Updater.app"
+  codesign -f -s "$IDENTITY" -o runtime --timestamp "$SPARKLE_FW"
+  codesign -f -s "$IDENTITY" -o runtime --timestamp --entitlements Vela/Vela.entitlements "$APP"
+fi
 codesign --verify --deep --strict --verbose=2 "$APP"
+for nested in "$SPARKLE_FW/Versions/B/Autoupdate" "$SPARKLE_FW/Versions/B/Updater.app"; do
+  details=$(codesign -dvv "$nested" 2>&1 || true)
+  [[ "$details" == *"Authority=Developer ID Application"* ]] || { echo "$nested is not Developer ID signed"; exit 1; }
+done
 codesign -d --entitlements :- "$APP" | grep -q apple-events && echo "✓ Apple Events entitlement present"
 # Plain `xcodebuild build` would add the debug get-task-allow entitlement, which notarization rejects.
 codesign -d --entitlements :- "$APP" | grep -q get-task-allow && { echo "get-task-allow entitlement present; aborting"; exit 1; }

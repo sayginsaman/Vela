@@ -5,5 +5,14 @@
     <link>https://github.com/sayginsaman/Vela</link>
     <description>Vela releases</description>
     <language>en</language>
+    <item>
+      <title>Vela 1.3.0</title>
+      <pubDate>Sun, 20 Sep 2026 00:21:10 +0000</pubDate>
+      <sparkle:version>4</sparkle:version>
+      <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://github.com/sayginsaman/Vela/releases/tag/v1.3.0</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/sayginsaman/Vela/releases/download/v1.3.0/Vela-1.3.0.dmg" length="5858881" type="application/octet-stream" sparkle:edSignature="dDJZrBJf1oTn7dtJPuFAHgOspMJX/zZOiXvbi2Bjs0Dd4rb7i6E39EbwmW9MlBB1RE1VFcppqv/2x6Dgm2CWCw==" />
+    </item>
   </channel>
 </rss>
