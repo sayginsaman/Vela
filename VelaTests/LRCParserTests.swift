@@ -25,7 +25,9 @@ final class LRCParserTests: XCTestCase {
         XCTAssertEqual(doc.quality, .lineSynced)
         XCTAssertEqual(doc.lines.count, 4)
         XCTAssertEqual(doc.lines[0].start, 1.0)
-        XCTAssertEqual(doc.lines[0].end, 4.5)
+        // The line lasts as long as it would take to sing, not until the next line starts.
+        XCTAssertGreaterThan(doc.lines[0].end, 1.0)
+        XCTAssertLessThan(doc.lines[0].end, 4.5)
         XCTAssertEqual(doc.lines[1].text, "Second line, longer")
         XCTAssertTrue(doc.lines[2].isEmpty)
         XCTAssertEqual(doc.sungLines.count, 3)
@@ -33,7 +35,7 @@ final class LRCParserTests: XCTestCase {
         XCTAssertEqual(doc.lines[0].words.count, 3)
         XCTAssertTrue(doc.lines[0].words.allSatisfy(\.isEstimated))
         XCTAssertEqual(doc.lines[0].words.first?.start, 1.0)
-        XCTAssertLessThanOrEqual(doc.lines[0].words.last!.end, 4.5)
+        XCTAssertLessThanOrEqual(doc.lines[0].words.last!.end, doc.lines[0].end)
     }
 
     func testMultipleTimestampsPerLineAndSorting() throws {

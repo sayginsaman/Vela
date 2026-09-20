@@ -37,12 +37,12 @@ class ScriptedPlayerSource: MusicSource, @unchecked Sendable {
 
     func snapshot() async throws -> PlaybackSnapshot {
         guard await isAvailable() else { throw MusicSourceError.notRunning }
-        let started = Date()
         let result = try await runner.run(snapshotScript)
-        // The position is read early in the script; stamping it after the whole round trip
-        // would make every lyric run late by the script's latency.
-        let elapsed = Date().timeIntervalSince(started)
-        let observedAt = started.addingTimeInterval(elapsed * 0.35)
+        // Measured against Spotify: the player evaluates `player position` when it services the
+        // Apple Event, i.e. at the very end of the round trip (best-fit sample point 100%,
+        // residual sd 1.2 ms over 30 samples with a ~180 ms round trip). Stamping it any earlier
+        // makes the clock lag by that fraction of the round trip and every lyric arrives late.
+        let observedAt = Date()
         guard case .text(let text) = result else { throw MusicSourceError.scriptFailed("No response") }
         let fields = text.components(separatedBy: Self.separator)
         let snapshot = parseSnapshot(fields, observedAt: observedAt)

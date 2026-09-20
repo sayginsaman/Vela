@@ -39,12 +39,28 @@ enum LRCParser {
         guard !parsed.isEmpty else { return nil }
         parsed.sort { $0.start < $1.start }
 
+        // Singing rate for this song, used to bound how long each line-synced line lasts.
+        var ratios: [Double] = []
+        for index in 0..<(parsed.count - 1) where parsed[index].words == nil {
+            let gap = parsed[index + 1].start - parsed[index].start
+            let syllables = WordTimingEstimator.syllableCount(inLine: parsed[index].text)
+            if gap > 0.2, syllables > 0 { ratios.append(Double(syllables) / gap) }
+        }
+        let rate = WordTimingEstimator.estimateRate(syllablesPerGap: ratios)
+
         var lines: [LyricLine] = []
         var wordID = 0
         for (index, item) in parsed.enumerated() {
             let start = max(0, item.start - offset)
             let nextStart = index + 1 < parsed.count ? max(0, parsed[index + 1].start - offset) : nil
-            let end = nextStart ?? (start + WordTimingEstimator.estimatedLineDuration(for: item.text))
+            let end: TimeInterval
+            if item.words != nil {
+                // Real word timings are authoritative: the line runs until the next one starts.
+                end = nextStart ?? (start + WordTimingEstimator.naturalDuration(of: item.text, rate: rate))
+            } else {
+                // Estimated: only as long as the words would plausibly take to sing.
+                end = start + WordTimingEstimator.sungSpan(of: item.text, gap: nextStart.map { $0 - start }, rate: rate)
+            }
             let clampedEnd = max(start, end)
             var words: [TimedWord] = []
             if let tagged = item.words, !tagged.isEmpty {

@@ -129,13 +129,18 @@ them (switch off "Word icons" if you would rather not). *Focus* keeps whole line
 precise word highlighting, *Drift* lets the neighbouring lines recede through a little depth,
 and *Bloom* makes each word swell and glow. All four respect the visual profile's motion.
 
-**Timing.** Vela stamps the player's position at the moment it was read rather than after the
-scripting round trip, shifts lyrics by the output device's reported latency (Bluetooth headphones
-add well over a hundred milliseconds; switch this off in Settings if it feels wrong), and lands
-highlights a few dozen milliseconds ahead of the sound, which is what reads as "in time". If a
-particular file still runs early or late, press `[` or `]` while watching to nudge it in tenths of
-a second, or use the offset slider in Settings. Imported `.lrc` files always win over anything
-fetched.
+**Timing.** Word-synced lyrics are used exactly as written. Line-synced lyrics only say when a
+line *starts*, so Vela works out how long each line takes to sing from its syllable count and a
+singing rate measured from the song itself, instead of stretching the words across the whole gap
+to the next line. Without that, a two-second line sitting in front of an instrumental would crawl
+across twenty seconds and the highlight would end up wildly behind the singer.
+
+Vela also stamps the player's position at the instant the player actually samples it (measured:
+the end of the scripting round trip, not the start), shifts lyrics by the output device's reported
+latency so Bluetooth headphones stay in step, and lands highlights a few dozen milliseconds ahead
+of the sound, which is what reads as "in time". If a particular file still runs early or late,
+press `[` or `]` while watching to nudge it in tenths of a second, or use the offset slider in
+Settings. Imported `.lrc` files always win over anything fetched.
 
 **Accessibility.** Reduce Motion removes camera movement, punches and rapid scale changes
 and swaps spatial transitions for crossfades; colour and brightness reactions stay. Increase

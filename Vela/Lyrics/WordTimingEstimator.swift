@@ -2,13 +2,84 @@ import Foundation
 
 /// Distributes a line's time span across its words when only line timing is available.
 ///
-/// Weights follow character count (a long word takes longer to sing), with extra weight for
-/// trailing punctuation that usually implies a pause. A short tail of the line is left unsung so
-/// consecutive lines read as phrases instead of a continuous fill.
+/// Line-synced lyrics say when a line *starts*, never when it ends. Spreading the words across
+/// the whole gap to the next line makes them drift steadily late — and catastrophically so when
+/// an instrumental follows, where a two-second line would be stretched over twenty. So each line
+/// is given the time it would plausibly take to sing, derived from its syllable count and a
+/// singing rate estimated from the song itself, and the remainder of the gap is left silent.
+///
+/// Within that span, words are weighted by length, with extra weight for trailing punctuation
+/// that usually implies a pause, and a short breath is left at the end of longer lines.
 enum WordTimingEstimator {
     /// Fraction of a line reserved as a breath at the end (only for lines longer than 1.5s).
     static let breathFraction = 0.08
     static let maximumBreath: TimeInterval = 0.6
+    /// Held notes and drawn-out phrasing get a little room beyond the plain syllable estimate.
+    static let naturalSlack = 1.2
+    /// No line is given less than this, however few syllables it has.
+    static let minimumLineDuration: TimeInterval = 0.7
+
+    // MARK: Singing rate
+
+    /// Syllables per second. The default suits mid-tempo pop; the range spans a slow ballad to
+    /// a dense rap verse.
+    static let defaultRate: Double = 3.6
+    static let rateRange: ClosedRange<Double> = 2.0...9.5
+
+    /// Syllables in a word, counted as vowel groups. Latin, Turkish and accented vowels count;
+    /// a word with no letters at all (an emoji, say) counts as none.
+    static func syllableCount(in word: String) -> Int {
+        let vowels = Set("aeiouyàáâãäåæèéêëìíîïòóôõöøùúûüÿıİşğçñ")
+        var count = 0
+        var previousWasVowel = false
+        var hasLetter = false
+        for character in word.lowercased() {
+            guard character.isLetter else { previousWasVowel = false; continue }
+            hasLetter = true
+            let isVowel = vowels.contains(character)
+            if isVowel && !previousWasVowel { count += 1 }
+            previousWasVowel = isVowel
+        }
+        guard hasLetter else { return 0 }
+        // English silent 'e': "wire" is one syllable, not two.
+        if count > 1, word.lowercased().hasSuffix("e") { count -= 1 }
+        return max(1, count)
+    }
+
+    static func syllableCount(inLine line: String) -> Int {
+        line.split(whereSeparator: { $0 == " " || $0 == "\t" }).reduce(0) { $0 + syllableCount(in: String($1)) }
+    }
+
+    /// Estimates how fast this song is sung, in syllables per second, from its line timings.
+    ///
+    /// Lines that run straight into the next one are sung continuously, so their syllables-per-gap
+    /// is close to the true rate. Lines followed by a pause have an artificially low ratio. Taking
+    /// a high percentile therefore picks out the continuously sung lines without having to know in
+    /// advance which ones they are.
+    static func estimateRate(syllablesPerGap ratios: [Double]) -> Double {
+        let usable = ratios.filter { $0.isFinite && $0 > 0 }.sorted()
+        guard usable.count >= 3 else { return defaultRate }
+        let index = min(usable.count - 1, Int((Double(usable.count - 1) * 0.75).rounded()))
+        let rate = usable[index]
+        return min(rateRange.upperBound, max(rateRange.lowerBound, rate))
+    }
+
+    /// How long this line would plausibly take to sing, ignoring whatever follows it.
+    static func naturalDuration(of text: String, rate: Double) -> TimeInterval {
+        let syllables = syllableCount(inLine: text)
+        guard syllables > 0 else { return minimumLineDuration }
+        return max(minimumLineDuration, Double(syllables) / max(0.5, rate) * naturalSlack)
+    }
+
+    /// The span a line actually occupies: its natural sung length, never spilling past the next
+    /// line. `gap` is `nil` for the last line of a document.
+    static func sungSpan(of text: String, gap: TimeInterval?, rate: Double) -> TimeInterval {
+        let natural = naturalDuration(of: text, rate: rate)
+        guard let gap else { return natural }
+        return min(max(0, gap), natural)
+    }
+
+    // MARK: Words within a line
 
     static func estimateWords(for text: String, start: TimeInterval, end: TimeInterval, firstID: Int = 0) -> [TimedWord] {
         let pieces = text.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
@@ -48,11 +119,5 @@ enum WordTimingEstimator {
         }
         // Even a one-letter word gets a floor so "I" or "a" is visible.
         return max(1.6, letters) + punctuationPause
-    }
-
-    /// Rough duration for a line whose end is unknown (last line of a file).
-    static func estimatedLineDuration(for text: String) -> TimeInterval {
-        let letters = text.unicodeScalars.filter { CharacterSet.letters.contains($0) }.count
-        return min(8, max(2.0, Double(letters) * 0.11))
     }
 }
