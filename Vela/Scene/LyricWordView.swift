@@ -77,7 +77,7 @@ struct LyricWordView: View {
         case .active: return 1
         case .completed:
             switch typography.style {
-            case .focus: return 0.32
+            case .focus, .stack: return 0.32
             case .drift: return 0.28
             case .bloom: return 0.5
             }
@@ -90,7 +90,7 @@ struct LyricWordView: View {
         guard !typography.reduceEffects, isActive else { return 0 }
         let base: CGFloat
         switch typography.style {
-        case .focus: base = typography.fontSize * 0.22
+        case .focus, .stack: base = typography.fontSize * 0.22
         case .drift: base = typography.fontSize * 0.25
         case .bloom: base = typography.fontSize * 0.5
         }
@@ -101,7 +101,7 @@ struct LyricWordView: View {
         guard !typography.reduceEffects, isActive else { return 0 }
         let base: Double
         switch typography.style {
-        case .focus: base = 0.5
+        case .focus, .stack: base = 0.5
         case .drift: base = 0.5
         case .bloom: base = 0.95
         }
@@ -114,7 +114,7 @@ struct LyricWordView: View {
         guard isActive else { return 1 }
         let styleScale: Double
         switch typography.style {
-        case .focus: styleScale = 1.035
+        case .focus, .stack: styleScale = 1.035
         case .drift: styleScale = 1.03
         case .bloom: styleScale = 1.11
         }

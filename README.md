@@ -25,9 +25,9 @@ players' own scripting interfaces, so nothing needs to be signed in to.
 Lyrics come from the community LRCLIB database, from `.lrc` files you import, or from the
 songs bundled with Demo Mode. When a file carries word timing it is used as is; when only
 line timing exists, Vela estimates the words from their length and punctuation and says so
-in a small badge. Plain lyrics fall back to a slow, unsynced scroll. The word being sung fills
-with the album's accent colour and the previous and next lines stay visible, quieter, above
-and below.
+in a small badge. Plain lyrics fall back to a slow, unsynced scroll. By default the words
+arrive one at a time down the middle of the screen, each lit as it is sung, at whatever pace
+the song sets; a line-based view is one click away.
 
 The light around the display is drawn on the GPU from the album palette. Bass expands the
 backdrop and thickens the glow, mids move the gradient, highs add fine detail, and beats
@@ -117,9 +117,13 @@ bar, previous / play-pause / next, full screen and Settings.
 | [ / ] | Nudge lyrics later / earlier by 0.1 s |
 | Esc | Close Settings, then leave full screen |
 
-**Lyric styles.** *Focus* keeps the current line centred with precise word highlighting and
-is the default. *Drift* lets the neighbouring lines recede through a little depth. *Bloom*
-makes each word swell and glow as it is sung. All three respect the visual profile's motion.
+**Lyric styles.** *Stack* is the default: one word per row, the word being sung large in the
+centre with a filled tag that sweeps across it, the words just sung shrinking and receding
+above, the next ones waiting below. The column advances word by word, so a fast verse flows
+down the screen fast and a held note fills it. Words with a matching symbol get one beside
+them (switch off "Word icons" if you would rather not). *Focus* keeps whole lines centred with
+precise word highlighting, *Drift* lets the neighbouring lines recede through a little depth,
+and *Bloom* makes each word swell and glow. All four respect the visual profile's motion.
 
 **Timing.** Vela stamps the player's position at the moment it was read rather than after the
 scripting round trip, shifts lyrics by the output device's reported latency (Bluetooth headphones

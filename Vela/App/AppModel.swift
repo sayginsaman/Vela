@@ -17,6 +17,11 @@ final class LyricTimelineBox: @unchecked Sendable {
     let document: LyricDocument
     let sungLines: [LyricLine]
     private let sungIndexByLineID: [Int: Int]
+    /// Every sung word in order, for the word-stack presentation.
+    let flatWords: [FlatWord]
+    private let flatStart: [Int]
+    /// Typical word length, used to size held words relative to quick ones.
+    let medianWordDuration: TimeInterval
 
     init(document: LyricDocument) {
         self.document = document
@@ -25,6 +30,29 @@ final class LyricTimelineBox: @unchecked Sendable {
         var map: [Int: Int] = [:]
         for (index, line) in sungLines.enumerated() { map[line.id] = index }
         sungIndexByLineID = map
+        var flat: [FlatWord] = []
+        var starts: [Int] = []
+        for (lineIndex, line) in sungLines.enumerated() {
+            starts.append(flat.count)
+            for (wordIndex, word) in line.words.enumerated() {
+                flat.append(FlatWord(id: flat.count, sungLine: lineIndex, wordIndex: wordIndex, word: word))
+            }
+        }
+        flatWords = flat
+        flatStart = starts
+        medianWordDuration = WordStackLayout.medianDuration(of: flat.map(\.word))
+    }
+
+    /// Flat index of a word addressed by sung-line and word index.
+    func flatIndex(sungLine: Int, word: Int) -> Int? {
+        guard sungLine >= 0, sungLine < flatStart.count, word >= 0, word < sungLines[sungLine].words.count else { return nil }
+        return flatStart[sungLine] + word
+    }
+
+    /// Flat index of the first word of a sung line.
+    func firstFlatIndex(ofSungLine line: Int) -> Int? {
+        guard line >= 0, line < flatStart.count else { return nil }
+        return flatStart[line]
     }
 
     func locate(at time: TimeInterval) -> LyricPosition {

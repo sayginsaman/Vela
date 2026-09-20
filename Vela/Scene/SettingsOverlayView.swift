@@ -188,6 +188,10 @@ struct SettingsOverlayView: View {
             .labelsHidden()
             Text(self.model.settings.lyricStyle.summary)
                 .font(.system(size: 11)).foregroundStyle(.secondary)
+            if self.model.settings.lyricStyle == .stack {
+                Toggle("Word icons", isOn: model.settings.wordIcons)
+                Text("Matched symbols appear beside words that have one.").font(.system(size: 11)).foregroundStyle(.tertiary)
+            }
             SliderRow(title: "Size", value: model.settings.lyricSize, range: VelaSettings.lyricSizeRange, format: { String(format: "%.0f%%", $0 * 100) })
             SliderRow(title: "Timing offset", value: model.settings.lyricsOffset, range: VelaSettings.offsetRange, step: 0.1,
                       format: { TimeFormatting.offset($0) }, reset: { self.model.settings.lyricsOffset = 0 })

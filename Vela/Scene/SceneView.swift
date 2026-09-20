@@ -51,8 +51,15 @@ struct SceneView: View {
         let palette = model.palette
         switch model.stage {
         case .lyrics(let box):
-            LyricsStageView(box: box, typography: typography, clock: model.clock, offset: model.lyricTimeShift, director: model.director)
-                .padding(.vertical, 60)
+            if model.settings.lyricStyle == .stack {
+                WordStackStageView(box: box, typography: typography, clock: model.clock, offset: model.lyricTimeShift,
+                                   director: model.director, showIcons: model.settings.wordIcons)
+                    .padding(.vertical, 60)
+                    .background(Color.black.opacity(model.settings.reduceEffects ? 0 : 0.18))
+            } else {
+                LyricsStageView(box: box, typography: typography, clock: model.clock, offset: model.lyricTimeShift, director: model.director)
+                    .padding(.vertical, 60)
+            }
         case .unsynced(let box):
             UnsyncedLyricsView(box: box, typography: typography, clock: model.clock)
                 .padding(.vertical, 40)

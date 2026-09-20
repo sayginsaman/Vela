@@ -1,10 +1,11 @@
 import Foundation
 
 enum LyricStyle: String, Codable, CaseIterable, Identifiable, Sendable {
-    case focus, drift, bloom
+    case stack, focus, drift, bloom
     var id: String { rawValue }
     var displayName: String {
         switch self {
+        case .stack: return "Stack"
         case .focus: return "Focus"
         case .drift: return "Drift"
         case .bloom: return "Bloom"
@@ -12,6 +13,7 @@ enum LyricStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     }
     var summary: String {
         switch self {
+        case .stack: return "One word at a time, flowing down the screen at the pace of the song."
         case .focus: return "Centered line with precise word highlighting."
         case .drift: return "Nearby lines drift through subtle depth."
         case .bloom: return "Words expand and glow as they are sung."
@@ -55,7 +57,11 @@ struct VelaSettings: Codable, Equatable, Sendable {
 
     /// Multiplier on the base lyric size (0.7...1.6).
     var lyricSize: Double = 1.0
-    var lyricStyle: LyricStyle = .focus
+    var lyricStyle: LyricStyle = .stack
+    /// Matched symbols beside words in the Stack style.
+    var wordIcons: Bool = true
+    /// Set once the Stack style has been offered as the default (older settings pre-date it).
+    var stackStyleIntroduced: Bool = true
 
     var glowThickness: Double = 1.0     // 0.3...2.0
     var glowIntensity: Double = 0.9     // 0...1.5
@@ -97,6 +103,13 @@ struct VelaSettings: Codable, Equatable, Sendable {
         manualBackground = try c.decodeIfPresent(RGBColor.self, forKey: .manualBackground) ?? base.manualBackground
         lyricSize = try c.decodeIfPresent(Double.self, forKey: .lyricSize) ?? base.lyricSize
         lyricStyle = try c.decodeIfPresent(LyricStyle.self, forKey: .lyricStyle) ?? base.lyricStyle
+        wordIcons = try c.decodeIfPresent(Bool.self, forKey: .wordIcons) ?? base.wordIcons
+        stackStyleIntroduced = try c.decodeIfPresent(Bool.self, forKey: .stackStyleIntroduced) ?? false
+        if !stackStyleIntroduced {
+            // Settings saved before the Stack style existed: adopt it once, as new installs do.
+            lyricStyle = .stack
+            stackStyleIntroduced = true
+        }
         glowThickness = try c.decodeIfPresent(Double.self, forKey: .glowThickness) ?? base.glowThickness
         glowIntensity = try c.decodeIfPresent(Double.self, forKey: .glowIntensity) ?? base.glowIntensity
         glowSpread = try c.decodeIfPresent(Double.self, forKey: .glowSpread) ?? base.glowSpread

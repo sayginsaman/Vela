@@ -88,7 +88,7 @@ private struct NeighbourStyle: ViewModifier {
     private var opacity: Double {
         guard distance != 0 else { return 1 }
         switch typography.style {
-        case .focus: return max(0.16, 0.5 - 0.16 * d)
+        case .focus, .stack: return max(0.16, 0.5 - 0.16 * d)
         case .bloom: return max(0.14, 0.42 - 0.14 * d)
         case .drift: return max(0.12, 0.55 - 0.16 * d)
         }
@@ -97,7 +97,7 @@ private struct NeighbourStyle: ViewModifier {
     private var blur: CGFloat {
         guard distance != 0, !typography.reduceEffects else { return 0 }
         switch typography.style {
-        case .focus: return CGFloat(d) * 0.9
+        case .focus, .stack: return CGFloat(d) * 0.9
         case .bloom: return CGFloat(d) * 1.4
         case .drift: return CGFloat(d) * 1.1
         }
@@ -108,7 +108,7 @@ private struct NeighbourStyle: ViewModifier {
     private var scale: CGFloat {
         guard distance != 0 else { return 1 }
         switch typography.style {
-        case .focus: return CGFloat(0.94 - 0.06 * depth)
+        case .focus, .stack: return CGFloat(0.94 - 0.06 * depth)
         case .bloom: return CGFloat(0.9 - 0.06 * depth)
         case .drift: return 1 - CGFloat(0.05 + 0.05 * depth) * CGFloat(d)
         }
@@ -119,7 +119,7 @@ private struct NeighbourStyle: ViewModifier {
         guard !typography.reduceMotion else { return 0 }
         switch typography.style {
         case .drift: return Double(-distance) * (9 + 9 * depth)
-        case .focus, .bloom: return depth > 0.4 ? Double(-distance) * (depth - 0.4) * 14 : 0
+        case .focus, .bloom, .stack: return depth > 0.4 ? Double(-distance) * (depth - 0.4) * 14 : 0
         }
     }
 
