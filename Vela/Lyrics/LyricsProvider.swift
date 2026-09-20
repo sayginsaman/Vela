@@ -8,6 +8,9 @@ struct LyricsQuery: Hashable, Sendable {
     var duration: TimeInterval?
     /// Source-specific identity so demo tracks can be matched by id.
     var trackIdentity: String
+    /// Spotify's own track id, when the track came from Spotify. Catalogues keyed by it can be
+    /// matched exactly instead of by title and artist.
+    var spotifyTrackID: String?
 
     init(track: TrackInfo) {
         title = track.title
@@ -15,10 +18,20 @@ struct LyricsQuery: Hashable, Sendable {
         album = track.album
         duration = track.duration
         trackIdentity = track.identityKey
+        spotifyTrackID = track.source == .spotify ? Self.spotifyTrackID(fromURI: track.id) : nil
     }
 
-    init(title: String, artist: String, album: String = "", duration: TimeInterval? = nil, trackIdentity: String = "") {
-        self.title = title; self.artist = artist; self.album = album; self.duration = duration; self.trackIdentity = trackIdentity
+    init(title: String, artist: String, album: String = "", duration: TimeInterval? = nil,
+         trackIdentity: String = "", spotifyTrackID: String? = nil) {
+        self.title = title; self.artist = artist; self.album = album; self.duration = duration
+        self.trackIdentity = trackIdentity; self.spotifyTrackID = spotifyTrackID
+    }
+
+    /// `spotify:track:4kjI1gwQZRKNDkw1nI475M` and a bare id both yield the id.
+    static func spotifyTrackID(fromURI uri: String) -> String? {
+        let candidate = uri.split(separator: ":").last.map(String.init) ?? uri
+        let valid = candidate.count >= 16 && candidate.allSatisfy { $0.isLetter || $0.isNumber }
+        return valid ? candidate : nil
     }
 }
 

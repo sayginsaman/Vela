@@ -22,7 +22,7 @@ Vela reads the Spotify or Apple Music app running on your own machine. Track, ar
 album, artwork, position and the previous / play-pause / next controls all work through the
 players' own scripting interfaces, so nothing needs to be signed in to.
 
-Lyrics come from the community LRCLIB database, from `.lrc` files you import, or from the
+Lyrics come from the community AMLL TTML database and LRCLIB, from `.lrc` files you import, or from the
 songs bundled with Demo Mode. When a file carries word timing it is used as is; when only
 line timing exists, Vela estimates the words from their length and punctuation and says so
 in a small badge. Plain lyrics fall back to a slow, unsynced scroll. By default the words
@@ -196,7 +196,8 @@ Everything lives in one app target, grouped by responsibility:
   adaptive rate, listens to the players' distributed notifications, and forwards commands).
 - `Lyrics/` — `LyricsProvider` protocol; `LRCParser` (standard and enhanced word-level LRC),
   `WordTimingEstimator`, `LyricTimeline` (cursor-based active-word lookup with binary-search
-  seeking), `LRCLIBProvider`, `LyricsCache` (disk, keyed by a normalised hash of artist/title/
+  seeking), `AMLLProvider` and `TTMLParser` (word-by-word TTML, merging syllables into words),
+  `LRCLIBProvider`, `LyricsCache` (disk, keyed by a normalised hash of artist/title/
   album/duration), `LocalLyricsStore` (imported `.lrc` files) and `LyricsService` (the resolver).
 - `Palette/` — `PaletteExtractor` (histogram over a 32×32 sample), `PaletteCorrector` (contrast,
   similarity and muddiness rules), `ArtworkProcessor` (soft and sharp pre-blurred backdrops).
@@ -238,7 +239,12 @@ confident contradiction. Genre metadata short-circuits all of this.
 
 Timing is honest end to end: a `LyricDocument` carries a `TimingQuality` (word-synced,
 line-synced, estimated, unsynced) and every `TimedWord` records whether its timestamps were
-estimated. LRCLIB returns line-level timing, so its words are estimated by length and punctuation;
+estimated. Providers are consulted in order: an imported `.lrc` file, the bundled demo lyrics,
+the disk cache, then AMLL, then LRCLIB. AMLL is a community database of word-by-word (really
+syllable-by-syllable) lyrics released under CC0, read straight from its public repository with no
+key; tracks are matched on Spotify's own track id where we have one, otherwise on title and
+artist together. It covers a few thousand songs rather than everything, so when it misses, LRCLIB
+answers and nothing is lost. LRCLIB returns line-level timing, so its words are estimated by length and punctuation;
 enhanced LRC files (`<mm:ss.xx>` tags) are used verbatim. Plain lyrics fall back to a slowly
 scrolling unsynced mode.
 
@@ -262,6 +268,8 @@ The README images were produced this way from Demo Mode.
   access. Apple Music artwork comes straight from the app.
 - Only Spotify and Apple Music are supported; there is no public API for "whatever is playing
   system-wide". Other players show the "Nothing playing" state.
+- AMLL carries true word-level timing but only for a few thousand songs, weighted towards
+  Japanese and Chinese releases, so most Western tracks still fall through to LRCLIB.
 - LRCLIB is a community database. Coverage is good but not universal; lyrics are line-synced,
   never word-synced. The provider boundary (`LyricsProvider`) is ready for a word-level provider
   should one be added; no keys or paid services are used.
