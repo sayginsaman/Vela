@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import Speech
 import AppKit
 import UniformTypeIdentifiers
 
@@ -119,6 +120,10 @@ final class AppModel {
     let director = VisualDirector()
     /// Sparkle-backed in-app updates.
     let updates = UpdateController()
+    /// Local forced alignment: pins lyric words to the audio actually playing.
+    let alignment = AlignmentCoordinator()
+    /// Bumped after a speech permission answer so the settings view re-reads the status.
+    private(set) var speechPermissionRevision = 0
 
     @ObservationIgnored private let demoSource: DemoMusicSource
     @ObservationIgnored private let coordinator: MusicSourceCoordinator
@@ -241,10 +246,11 @@ final class AppModel {
 
     var lyricsQualityDescription: String? {
         guard case .ready(let box) = lyrics else { return nil }
+        let aligned = box.document.provenance.contains("aligned") ? " · aligned" : ""
         switch box.document.quality {
-        case .wordSynced: return "Word-synced"
-        case .lineSynced: return "Line-synced · words estimated"
-        case .estimated: return "Estimated timing"
+        case .wordSynced: return "Word-synced" + aligned
+        case .lineSynced: return "Line-synced · words estimated" + aligned
+        case .estimated: return "Estimated timing" + aligned
         case .unsynced: return "Unsynced"
         }
     }
@@ -320,6 +326,10 @@ final class AppModel {
         director.onPreviewEnded = { [weak self] in
             Task { @MainActor [weak self] in self?.previewProfile = nil }
         }
+        audio.sampleSink = alignment.sampleSink()
+        alignment.onRefinedDocument = { [weak self] document in
+            self?.applyRefinedLyrics(document)
+        }
         outputLatency = latencyMonitor.reading
         latencyMonitor.onChange = { [weak self] reading in
             Task { @MainActor [weak self] in
@@ -381,6 +391,9 @@ final class AppModel {
     private func sampleDetection() {
         let (snapshot, live) = audio.store.read()
         diagnostics = live ? snapshot : .silent
+        if settings.localAlignment, playback.isPlaying, audio.status == .capturing {
+            alignment.startListening(songTime: currentPosition)
+        }
         guard live, playback.isPlaying, track != nil else { return }
         let now = ProcessInfo.processInfo.systemUptime
         if let changed = detector.ingest(snapshot, at: now) {
@@ -431,6 +444,7 @@ final class AppModel {
         detection = detector.detection
         audioEstimate = .neutral
         audio.resetAnalysis()
+        alignment.stop()
         audio.updateClock(clock, fixture: currentFixture)
         guard let newTrack else {
             withAnimation(.easeInOut(duration: 1.0)) {
@@ -469,7 +483,9 @@ final class AppModel {
             VelaLog.lyrics.info("lyrics for \(newTrack.title, privacy: .public): \(String(describing: outcome).prefix(60), privacy: .public)")
             withAnimation(.easeInOut(duration: 0.5)) {
                 switch outcome {
-                case .found(let doc): self.lyrics = .ready(LyricTimelineBox(document: doc))
+                case .found(let doc):
+                    self.lyrics = .ready(LyricTimelineBox(document: doc))
+                    self.beginAlignment(for: newTrack, document: doc)
                 case .instrumental: self.lyrics = .instrumental
                 case .notFound: self.lyrics = .unavailable(.notFound)
                 case .offline: self.lyrics = .unavailable(.offline)
@@ -478,6 +494,49 @@ final class AppModel {
                     self.lyrics = .unavailable(.failed(message))
                 }
             }
+        }
+    }
+
+    /// Swaps in a better-timed document without disturbing anything else on screen.
+    private func applyRefinedLyrics(_ document: LyricDocument) {
+        guard case .ready = lyrics else { return }
+        lyrics = .ready(LyricTimelineBox(document: document))
+        VelaLog.lyrics.info("alignment refined \(document.provenance, privacy: .public)")
+    }
+
+    /// Whether the user has granted speech recognition, which local alignment needs.
+    var speechAuthorisation: SFSpeechRecognizerAuthorizationStatus {
+        _ = speechPermissionRevision   // re-reads the live status after the user answers.
+        return AlignmentCoordinator.authorisationStatus
+    }
+
+    /// Asks for speech recognition and, once granted, starts aligning the current track.
+    func requestSpeechPermission() {
+        Task { [weak self] in
+            _ = await AlignmentCoordinator.requestAuthorisation()
+            guard let self else { return }
+            self.speechPermissionRevision &+= 1
+            if case .ready(let box) = self.lyrics, let track = self.track {
+                self.beginAlignment(for: track, document: box.document)
+            }
+        }
+    }
+
+    /// Forgets every alignment learned from listening.
+    func clearStoredAlignments() {
+        alignment.clearStoredAlignments()
+    }
+
+    /// Hands the freshly resolved lyrics to the aligner, and adopts a stored alignment from a
+    /// previous listen when there is one.
+    private func beginAlignment(for track: TrackInfo, document: LyricDocument) {
+        let enabled = settings.localAlignment
+        Task { [weak self] in
+            guard let self else { return }
+            let stored = await self.alignment.begin(query: LyricsQuery(track: track), document: document,
+                                                    enabled: enabled, songTime: self.currentPosition)
+            guard self.track?.identityKey == track.identityKey, let stored else { return }
+            self.applyRefinedLyrics(stored)
         }
     }
 
@@ -531,6 +590,7 @@ final class AppModel {
         updated.seek(to: clamped)
         clock = updated
         audio.updateClock(clock, fixture: currentFixture)
+        alignment.playbackJumped(to: clamped)
         Task { [coordinator] in
             do { try await coordinator.perform { try await $0.seek(to: clamped) } }
             catch { await self.report(error) }
@@ -593,6 +653,10 @@ final class AppModel {
 
     func settingsDidChange(from old: VelaSettings, to new: VelaSettings) {
         pushVisualInputs()
+        if old.localAlignment != new.localAlignment {
+            alignment.stop()
+            if case .ready(let box) = lyrics, let track { beginAlignment(for: track, document: box.document) }
+        }
         if old.preferredSource != new.preferredSource {
             if new.preferredSource == .demo {
                 setDemoMode(true)

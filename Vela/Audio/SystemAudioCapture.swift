@@ -26,6 +26,9 @@ final class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate, @unc
     private var samplesProcessed = 0
     private var appliedResetGeneration = 0
     private var stopHandler: (@Sendable (String) -> Void)?
+    /// Optional second consumer of the same mono stream, used by local alignment. Called on the
+    /// audio queue with a contiguous, non-overlapping run of samples.
+    var sampleSink: (@Sendable ([Float], Double) -> Void)?
 
     init(store: FeatureStore) {
         self.store = store
@@ -127,6 +130,9 @@ final class SystemAudioCapture: NSObject, SCStreamOutput, SCStreamDelegate, @unc
         let time = Double(samplesProcessed + ring.count - size) / analyzer.sampleRate
         let frame = ring.withUnsafeBufferPointer { ptr in
             analyzer.analyze(UnsafeBufferPointer(rebasing: ptr[(ring.count - size)...]), time: time)
+        }
+        if let sampleSink, ring.count >= hop {
+            sampleSink(Array(ring[0..<hop]), analyzer.sampleRate)
         }
         ring.removeFirst(min(ring.count, hop))
         samplesProcessed += hop

@@ -76,8 +76,9 @@ Profiles crossfade rather than switch. Pop is the neutral fallback.
 
 Everything lives in one translucent panel over the scene: the visual profile, four sliders for
 how strongly the scene reacts (overall, background, edge light, lyric motion), particles, a
-gentler-motion toggle, a ten-second preview of any profile without touching playback, and an
-Analysis disclosure that shows what the detector is currently hearing.
+gentler-motion toggle, a ten-second preview of any profile without touching playback, an
+Analysis disclosure that shows what the detector is currently hearing, the lyric layout (centred
+or split), your own Musixmatch key, and local alignment.
 
 ## Install
 
@@ -262,6 +263,28 @@ the spot, and used only for their own lookups. LRCLIB returns line-level timing,
 enhanced LRC files (`<mm:ss.xx>` tags) are used verbatim. Plain lyrics fall back to a slowly
 scrolling unsynced mode.
 
+### Local alignment
+
+Every source above can be wrong about *this* recording: a live version, a remaster, a different
+edit. Turning on **Align lyrics by listening** in Settings has Vela recognise the song from the
+system audio it already captures, then match what it heard against the lyrics it already has.
+
+The matching is a Needleman-Wunsch alignment over normalised words, scored by edit-distance
+similarity, with a ten-second window so a repeated chorus line cannot anchor to the wrong verse.
+Matched words are pinned to the time they were actually sung; the words between two anchors are
+redistributed by syllable count, and timings are forced monotonic. Because the lyric text is
+already known, the hard part is the alignment rather than the recognition, so Apple's on-device
+`SFSpeechRecognizer` is enough. WhisperX and whisper.cpp were the alternatives: the first is a
+Python and PyTorch stack that cannot ship inside a notarized app bundle, and the second means a
+large model download for a job the system already does. `SpeechRecognising` is a small protocol,
+so a stronger engine can be dropped in without touching the aligner.
+
+Recognition is on-device, audio is never uploaded and never written to disk, and the whole
+feature is off until you turn it on and grant Speech Recognition. Only the finished word timings
+are saved, under `Application Support/Vela/Alignments`, and a better listen replaces a worse one.
+"Forget learned alignments" in Settings deletes them all. When an alignment is in use, the lyrics
+badge reads *aligned*.
+
 ### Environment hooks
 
 A few environment variables make the app scriptable for checks and screenshots:
@@ -289,6 +312,9 @@ The README images were produced this way from Demo Mode.
 - LRCLIB is a community database. Coverage is good but not universal; lyrics are line-synced,
   never word-synced. The provider boundary (`LyricsProvider`) is ready for a word-level provider
   should one be added; no keys or paid services are used.
+- Local alignment describes audio that has already played, so it cannot improve the word being
+  sung at this instant. It corrects the rest of the song from each anchor onwards, and the saved
+  result makes the next play of that track accurate from the first second.
 - With ad-hoc local builds, macOS re-asks for permissions after each rebuild (see above).
 - macOS may require the app to be relaunched after Screen Recording permission is first granted.
 

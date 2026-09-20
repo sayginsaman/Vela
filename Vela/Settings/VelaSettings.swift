@@ -107,6 +107,8 @@ struct VelaSettings: Codable, Equatable, Sendable {
     var reduceIntenseMotion: Bool = false
     /// Shift lyrics earlier by the output device's reported latency (Bluetooth adds a lot).
     var compensateOutputLatency: Bool = true
+    /// Listen to the song and pin lyric words to what is actually sung.
+    var localAlignment: Bool = false
 
     static let reactionRange: ClosedRange<Double> = 0...1.5
 
@@ -148,6 +150,7 @@ struct VelaSettings: Codable, Equatable, Sendable {
         particlesEnabled = try c.decodeIfPresent(Bool.self, forKey: .particlesEnabled) ?? base.particlesEnabled
         reduceIntenseMotion = try c.decodeIfPresent(Bool.self, forKey: .reduceIntenseMotion) ?? base.reduceIntenseMotion
         compensateOutputLatency = try c.decodeIfPresent(Bool.self, forKey: .compensateOutputLatency) ?? base.compensateOutputLatency
+        localAlignment = try c.decodeIfPresent(Bool.self, forKey: .localAlignment) ?? base.localAlignment
     }
 
     static let lyricSizeRange: ClosedRange<Double> = 0.7...1.6

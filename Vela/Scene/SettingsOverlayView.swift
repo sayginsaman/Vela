@@ -24,6 +24,7 @@ struct SettingsOverlayView: View {
                         playbackSection(model: $model)
                         demoSection
                         keysSection
+                        alignmentSection(model: $model)
                         permissionsSection
                         updatesSection
                         footer
@@ -330,6 +331,34 @@ struct SettingsOverlayView: View {
                 Text(status).font(.system(size: 11))
                     .foregroundStyle(status == "Key accepted." ? .green : .orange)
             }
+        }
+    }
+
+    private func alignmentSection(model: Bindable<AppModel>) -> some View {
+        SettingsSection(title: "Local alignment") {
+            Text("Vela can listen to the song through the system audio it already captures and pin each lyric word to the moment it is actually sung. Recognition runs on this Mac, nothing is uploaded, and no audio is kept. It corrects drift as the song plays, and the result is saved so the next play starts in time.")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Toggle("Align lyrics by listening", isOn: model.settings.localAlignment)
+            switch self.model.speechAuthorisation {
+            case .authorized:
+                Text(self.model.alignment.status.summary).font(.system(size: 11)).foregroundStyle(.tertiary)
+            case .denied, .restricted:
+                Text("Speech recognition is turned off for Vela. Allow it under Privacy & Security › Speech Recognition.")
+                    .font(.system(size: 11)).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            default:
+                HStack {
+                    Text("Needs permission to recognise speech.").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Allow") { self.model.requestSpeechPermission() }.controlSize(.small)
+                }
+            }
+            HStack {
+                Button("Forget learned alignments") { self.model.clearStoredAlignments() }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 

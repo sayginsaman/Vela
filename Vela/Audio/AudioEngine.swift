@@ -18,6 +18,10 @@ final class AudioEngine {
     @ObservationIgnored private var demoTask: Task<Void, Never>?
     @ObservationIgnored private let clockBox = ClockBox()
     @ObservationIgnored private var startingTask: Task<Void, Never>?
+    /// Second consumer of the captured mono stream, used by local alignment.
+    @ObservationIgnored var sampleSink: (@Sendable ([Float], Double) -> Void)? {
+        didSet { capture?.sampleSink = sampleSink }
+    }
 
     /// Shared with the demo producer so it follows seeks, pauses and fixture changes.
     final class ClockBox: @unchecked Sendable {
@@ -113,6 +117,7 @@ final class AudioEngine {
         }
         status = .starting
         let capture = SystemAudioCapture(store: store)
+        capture.sampleSink = sampleSink
         self.capture = capture
         startingTask = Task { [weak self] in
             do {
