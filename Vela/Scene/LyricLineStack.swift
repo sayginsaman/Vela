@@ -46,7 +46,7 @@ struct LyricLineStack: View {
     var body: some View {
         GeometryReader { proxy in
             let visible = max(0, anchor - before)...min(lines.count - 1, anchor + after)
-            ZStack {
+            ZStack(alignment: typography.alignment.stackAlignment) {
                 ForEach(visible, id: \.self) { index in
                     let distance = index - anchor
                     LyricLineView(line: lines[index], role: role(for: index),

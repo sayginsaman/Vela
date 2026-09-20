@@ -29,7 +29,7 @@ struct LyricLineView: View {
 
     var body: some View {
         let words = line.isRightToLeft ? Array(line.words.reversed()) : line.words
-        FlowLayout(spacing: typography.fontSize * 0.24, lineSpacing: typography.fontSize * 0.1) {
+        FlowLayout(spacing: typography.fontSize * 0.24, lineSpacing: typography.fontSize * 0.1, alignment: typography.alignment) {
             ForEach(words) { word in
                 let index = line.words.firstIndex(where: { $0.id == word.id }) ?? 0
                 let wordState = state(for: index)
@@ -42,7 +42,7 @@ struct LyricLineView: View {
             }
         }
         .environment(\.layoutDirection, .leftToRight)
-        .frame(maxWidth: maxWidth)
+        .frame(maxWidth: maxWidth, alignment: typography.alignment.frameAlignment)
         // A soft drop shadow lifts the sung line off bright artwork.
         .shadow(color: .black.opacity(role == .current && !typography.reduceEffects ? 0.32 : 0), radius: 16, y: 8)
         .accessibilityElement(children: .ignore)

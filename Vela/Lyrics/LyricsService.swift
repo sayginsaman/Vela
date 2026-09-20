@@ -21,7 +21,7 @@ actor LyricsService {
 
     init(cache: LyricsCache, localStore: LocalLyricsStore,
          bundled: [LyricsProvider] = [DemoLyricsProvider()],
-         remote: [LyricsProvider] = [AMLLProvider(), LRCLIBProvider()],
+         remote: [LyricsProvider] = [AMLLProvider(), MusixmatchProvider(), LRCLIBProvider()],
          isOnline: @escaping @Sendable () -> Bool = { NetworkMonitor.shared.isOnline }) {
         self.cache = cache
         self.localStore = localStore

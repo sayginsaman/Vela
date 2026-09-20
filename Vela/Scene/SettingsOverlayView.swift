@@ -5,6 +5,7 @@ struct SettingsOverlayView: View {
     @Environment(AppModel.self) private var model
     @State private var automation: [AppModel.AutomationReport] = []
     @State private var displays = WindowController.availableDisplays()
+    @State private var musixmatchKey = ""
 
     var body: some View {
         @Bindable var model = model
@@ -22,6 +23,7 @@ struct SettingsOverlayView: View {
                         lightSection(model: $model)
                         playbackSection(model: $model)
                         demoSection
+                        keysSection
                         permissionsSection
                         updatesSection
                         footer
@@ -182,6 +184,13 @@ struct SettingsOverlayView: View {
 
     private func lyricsSection(model: Bindable<AppModel>) -> some View {
         SettingsSection(title: "Lyrics") {
+            Picker("Layout", selection: model.settings.sceneLayout) {
+                ForEach(SceneLayout.allCases) { Text($0.displayName).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            Text(self.model.settings.sceneLayout.summary)
+                .font(.system(size: 11)).foregroundStyle(.secondary)
             Picker("Style", selection: model.settings.lyricStyle) {
                 ForEach(LyricStyle.allCases) { Text($0.displayName).tag($0) }
             }
@@ -285,6 +294,41 @@ struct SettingsOverlayView: View {
                     case .notRunning: Text("Not running").font(.system(size: 11)).foregroundStyle(.tertiary)
                     }
                 }
+            }
+        }
+    }
+
+    private var keysSection: some View {
+        SettingsSection(title: "Word-by-word lyrics") {
+            Text("Vela reads the free AMLL database first. If you have your own Musixmatch key with word-by-word (richsync) access, add it here and it will be tried before LRCLIB. The key is stored in your login keychain and used only for your lookups.")
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if self.model.hasMusixmatchKey {
+                HStack {
+                    Label(self.model.musixmatchKeyHint, systemImage: "key.fill")
+                        .font(.system(size: 12, design: .monospaced))
+                    Spacer()
+                    Button("Check") { self.model.checkMusixmatchKey() }
+                        .controlSize(.small)
+                        .disabled(self.model.isCheckingMusixmatchKey)
+                    Button("Remove") { self.model.removeMusixmatchKey(); musixmatchKey = "" }
+                        .controlSize(.small)
+                }
+            } else {
+                HStack {
+                    SecureField("Musixmatch API key", text: $musixmatchKey)
+                        .textFieldStyle(.roundedBorder)
+                        .controlSize(.small)
+                    Button("Save") { self.model.saveMusixmatchKey(musixmatchKey); musixmatchKey = "" }
+                        .controlSize(.small)
+                        .disabled(musixmatchKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            if self.model.isCheckingMusixmatchKey {
+                Text("Checking…").font(.system(size: 11)).foregroundStyle(.tertiary)
+            } else if let status = self.model.musixmatchStatus {
+                Text(status).font(.system(size: 11))
+                    .foregroundStyle(status == "Key accepted." ? .green : .orange)
             }
         }
     }

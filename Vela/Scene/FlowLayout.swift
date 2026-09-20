@@ -5,6 +5,7 @@ import SwiftUI
 struct FlowLayout: Layout {
     var spacing: CGFloat = 12
     var lineSpacing: CGFloat = 6
+    var alignment: LyricAlignment = .center
 
     struct Row { var indices: [Int]; var width: CGFloat; var height: CGFloat }
 
@@ -40,7 +41,7 @@ struct FlowLayout: Layout {
         let rows = rows(sizes: sizes, maxWidth: bounds.width)
         var y = bounds.minY
         for row in rows {
-            var x = bounds.minX + (bounds.width - row.width) / 2
+            var x = bounds.minX + (alignment == .leading ? 0 : (bounds.width - row.width) / 2)
             for index in row.indices {
                 let size = sizes[index]
                 subviews[index].place(at: CGPoint(x: x, y: y + (row.height - size.height) / 2), anchor: .topLeading, proposal: ProposedViewSize(size))

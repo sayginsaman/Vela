@@ -1,5 +1,15 @@
 import SwiftUI
 
+/// Where lyric rows sit horizontally. Centred on the full-screen stage, leading in the split
+/// layout so the words line up against the panel.
+enum LyricAlignment: Equatable {
+    case center, leading
+
+    var frameAlignment: Alignment { self == .leading ? .leading : .center }
+    var stackAlignment: Alignment { self == .leading ? .leading : .center }
+    var textAlignment: TextAlignment { self == .leading ? .leading : .center }
+}
+
 enum WordState: Equatable {
     case upcoming
     case active(progress: Double)
@@ -14,6 +24,7 @@ struct LyricTypography: Equatable {
     var reduceEffects: Bool
     var reduceMotion: Bool
     var increaseContrast: Bool
+    var alignment: LyricAlignment = .center
     /// Profile-driven motion (springs, scale, bloom, depth).
     var motion: LyricMotionStyle = .neutral
     /// Decaying beat pulse 0…1, quantised so it only invalidates the current line.

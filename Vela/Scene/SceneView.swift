@@ -7,7 +7,8 @@ struct SceneView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let typography = typography(for: proxy.size)
+            let layout = StageLayout(size: proxy.size, split: model.settings.sceneLayout == .split && model.track != nil)
+            let typography = typography(for: layout)
             ZStack {
                 ReactiveSceneView(director: model.director, features: model.audio.store,
                                   artworkSoft: model.backdrop, artworkSharp: model.backdropSharp,
@@ -18,15 +19,31 @@ struct SceneView: View {
                     Color.black.opacity(0.28).ignoresSafeArea()
                 }
 
-                stage(typography: typography)
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .id(model.transitionID)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.7), value: model.transitionID)
+                HStack(spacing: 0) {
+                    if layout.isSplit {
+                        NowPlayingPanel(width: layout.panelWidth, height: proxy.size.height)
+                            .frame(width: layout.panelWidth, height: proxy.size.height)
+                            // A background never affects layout, so the scrim can spill past the
+                            // panel to feather out without dragging the panel off the edge.
+                            .background(alignment: .leading) { panelScrim(width: layout.panelWidth) }
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
+                    stage(typography: typography, layout: layout)
+                        // Padding inside the fixed width: outside it the row would overflow the
+                        // window and SwiftUI would centre the overflow, shifting both columns.
+                        .padding(.leading, layout.isSplit ? 36 : 0)
+                        .padding(.trailing, layout.isSplit ? 44 : 0)
+                        .frame(width: layout.lyricWidth, height: proxy.size.height)
+                        .id(model.transitionID)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.7), value: model.transitionID)
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
 
                 overlays
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
+            .animation(.easeInOut(duration: 0.45), value: layout.isSplit)
         }
         .background(Color.black)
         .onContinuousHover { phase in
@@ -36,18 +53,34 @@ struct SceneView: View {
         .preferredColorScheme(.dark)
     }
 
-    private func typography(for size: CGSize) -> LyricTypography {
-        let base = min(size.width * 0.052, size.height * 0.075)
+    /// Darkens the left edge just enough for the panel to read over busy artwork, feathering out
+    /// past the panel so there is never a visible seam against the lyrics.
+    private func panelScrim(width: CGFloat) -> some View {
+        LinearGradient(colors: [Color.black.opacity(model.reduceTransparency ? 0.85 : 0.52),
+                                Color.black.opacity(model.reduceTransparency ? 0.7 : 0.34),
+                                .clear],
+                       startPoint: .leading, endPoint: .trailing)
+            .frame(width: width * 1.45)
+            .allowsHitTesting(false)
+    }
+
+    private func typography(for layout: StageLayout) -> LyricTypography {
+        // The split column is narrower and the words are left-aligned, so they need a little
+        // less size to carry the same weight.
+        let base = layout.isSplit
+            ? min(layout.lyricWidth * 0.044, layout.size.height * 0.062)
+            : min(layout.lyricWidth * 0.052, layout.size.height * 0.075)
         return LyricTypography(fontSize: max(22, base * model.settings.lyricSize),
                                style: model.settings.lyricStyle,
                                palette: model.palette,
                                reduceEffects: model.settings.reduceEffects,
                                reduceMotion: reduceMotion,
-                               increaseContrast: model.increaseContrast)
+                               increaseContrast: model.increaseContrast,
+                               alignment: layout.alignment)
     }
 
     @ViewBuilder
-    private func stage(typography: LyricTypography) -> some View {
+    private func stage(typography: LyricTypography, layout: StageLayout) -> some View {
         let palette = model.palette
         switch model.stage {
         case .lyrics(let box):
@@ -55,7 +88,7 @@ struct SceneView: View {
                 WordStackStageView(box: box, typography: typography, clock: model.clock, offset: model.lyricTimeShift,
                                    director: model.director, showIcons: model.settings.wordIcons)
                     .padding(.vertical, 60)
-                    .background(Color.black.opacity(model.settings.reduceEffects ? 0 : 0.18))
+                    .background(layout.isSplit || model.settings.reduceEffects ? Color.clear : Color.black.opacity(0.18))
             } else {
                 LyricsStageView(box: box, typography: typography, clock: model.clock, offset: model.lyricTimeShift, director: model.director)
                     .padding(.vertical, 60)
@@ -64,19 +97,27 @@ struct SceneView: View {
             UnsyncedLyricsView(box: box, typography: typography, clock: model.clock)
                 .padding(.vertical, 40)
         case .instrumental:
-            if let track = model.track {
+            if layout.isSplit {
+                CompactStageMessage(symbol: "waveform", caption: "Instrumental", palette: palette, alignment: layout.alignment)
+            } else if let track = model.track {
                 TrackHeroView(track: track, caption: "Instrumental", palette: palette) {
                     BreathingIndicator(countdown: nil, color: palette.highlight.swiftUIColor, reduceMotion: reduceMotion, size: 12)
                 }
             }
         case .loadingLyrics:
-            if let track = model.track {
+            if layout.isSplit {
+                CompactStageMessage(symbol: "text.magnifyingglass", caption: "Finding lyrics…", palette: palette, alignment: layout.alignment)
+            } else if let track = model.track {
                 TrackHeroView(track: track, caption: "Finding lyrics…", palette: palette) {
                     PulsingDot(color: palette.highlight.swiftUIColor, reduceMotion: reduceMotion)
                 }
             }
         case .lyricsUnavailable(let reason):
-            if let track = model.track {
+            if layout.isSplit {
+                CompactStageMessage(symbol: reason == .offline ? "wifi.slash" : "text.quote",
+                                    caption: unavailableCaption(reason), actions: unavailableActions(reason),
+                                    palette: palette, alignment: layout.alignment)
+            } else if let track = model.track {
                 TrackHeroView(track: track, caption: unavailableCaption(reason), palette: palette, actions: unavailableActions(reason)) {
                     Image(systemName: reason == .offline ? "wifi.slash" : "text.quote")
                         .font(.system(size: 26, weight: .light))
@@ -252,6 +293,25 @@ private struct TrackIntroCard: View {
         )
         .accessibilityElement(children: .combine)
     }
+}
+
+/// Where the panel ends and the lyrics begin. Split needs room, so a narrow window quietly
+/// falls back to the centred stage.
+struct StageLayout: Equatable {
+    var size: CGSize
+    var isSplit: Bool
+    var panelWidth: CGFloat
+
+    static let minimumWidthForSplit: CGFloat = 860
+
+    init(size: CGSize, split: Bool) {
+        self.size = size
+        isSplit = split && size.width >= Self.minimumWidthForSplit
+        panelWidth = isSplit ? max(300, min(430, size.width * 0.31)) : 0
+    }
+
+    var lyricWidth: CGFloat { max(0, size.width - panelWidth) }
+    var alignment: LyricAlignment { isSplit ? .leading : .center }
 }
 
 /// Small pill in the top-left naming the source and lyric timing quality.

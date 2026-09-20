@@ -171,6 +171,13 @@ final class AppModel {
     /// Reported output-device latency and the device it belongs to.
     private(set) var outputLatency: OutputLatencyMonitor.Reading = .none
 
+    // MARK: User-supplied provider keys
+    /// Masked form of the stored Musixmatch key, empty when none is set.
+    private(set) var musixmatchKeyHint = KeychainStore.redacted(KeychainStore.get(account: MusixmatchProvider.keychainAccount))
+    private(set) var musixmatchStatus: String?
+    private(set) var isCheckingMusixmatchKey = false
+    var hasMusixmatchKey: Bool { !musixmatchKeyHint.isEmpty }
+
     // MARK: UI state
     var isFullscreen = false
     private(set) var overlayVisible = true
@@ -332,6 +339,8 @@ final class AppModel {
         if env["VELA_SCREENSHOT_PATH"] != nil {
             settingsStore.isPersistenceEnabled = false
             if let profileOverride { settings.visualProfile = profileOverride }
+            if let layout = env["VELA_LAYOUT"].flatMap(SceneLayout.init(rawValue:)) { settings.sceneLayout = layout }
+            if let style = env["VELA_LYRIC_STYLE"].flatMap(LyricStyle.init(rawValue:)) { settings.lyricStyle = style }
             showOnboarding = env["VELA_SCREENSHOT_ONBOARDING"] == "1"
             if env["VELA_SCREENSHOT_SETTINGS"] == "1" {
                 let delay = max(0.5, (Double(env["VELA_SCREENSHOT_DELAY"] ?? "") ?? 20) - 1.5)
@@ -733,6 +742,47 @@ final class AppModel {
     func openScreenRecordingSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
             NSWorkspace.shared.open(url)
+        }
+    }
+
+    // MARK: User-supplied provider keys
+
+    /// Stores the key in the login keychain and checks it against Musixmatch straight away, so
+    /// nobody is left wondering whether it took.
+    func saveMusixmatchKey(_ key: String) {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard KeychainStore.set(trimmed, account: MusixmatchProvider.keychainAccount) else {
+            musixmatchStatus = "Could not write to the keychain."
+            return
+        }
+        musixmatchKeyHint = KeychainStore.redacted(trimmed)
+        checkMusixmatchKey()
+    }
+
+    func removeMusixmatchKey() {
+        KeychainStore.remove(account: MusixmatchProvider.keychainAccount)
+        musixmatchKeyHint = ""
+        musixmatchStatus = nil
+    }
+
+    func checkMusixmatchKey() {
+        guard let key = KeychainStore.get(account: MusixmatchProvider.keychainAccount) else {
+            musixmatchStatus = "No key stored."
+            return
+        }
+        isCheckingMusixmatchKey = true
+        musixmatchStatus = nil
+        Task { [weak self] in
+            let failure = await MusixmatchProvider().validate(key: key)
+            guard let self else { return }
+            self.isCheckingMusixmatchKey = false
+            self.musixmatchStatus = failure ?? "Key accepted."
+            if failure == nil, let track = self.track {
+                // Re-resolve so the current song can pick up word-level lyrics immediately.
+                await self.lyricsService.forget(track: track)
+                self.retryLyrics()
+            }
         }
     }
 

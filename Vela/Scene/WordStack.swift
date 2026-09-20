@@ -121,7 +121,7 @@ private struct WordStackColumn: View {
         GeometryReader { proxy in
             let lower = max(0, anchor - before)
             let upper = min(words.count - 1, anchor + after)
-            ZStack {
+            ZStack(alignment: typography.alignment.stackAlignment) {
                 if lower <= upper {
                     // Identity is the word itself, so rows keep their view as the window slides.
                     ForEach(words[lower...upper]) { flat in
@@ -133,7 +133,7 @@ private struct WordStackColumn: View {
                                       progress: index == anchor ? progress : 0,
                                       typography: index == anchor ? typography : typography.still,
                                       sizeFactor: WordStackLayout.sizeFactor(duration: words[index].word.duration, median: medianDuration),
-                                      maxWidth: proxy.size.width * 0.88,
+                                      maxWidth: proxy.size.width * (typography.alignment == .leading ? 0.98 : 0.88),
                                       showIcon: showIcons)
                             .offset(y: offset(for: index))
                             .transition(.asymmetric(insertion: .opacity.combined(with: .offset(y: typography.reduceMotion ? 0 : 28)),
@@ -231,7 +231,7 @@ private struct StackWordView: View {
                     .accessibilityHidden(true)
             }
         }
-        .frame(maxWidth: maxWidth)
+        .frame(maxWidth: maxWidth, alignment: typography.alignment.frameAlignment)
         .opacity(opacity)
         .blur(radius: typography.reduceEffects || role == .current ? 0 : CGFloat(abs(distance)) * 0.8)
         .scaleEffect(role == .current && !typography.reduceMotion ? 1 + 0.03 * typography.beatImpulse : 1)

@@ -21,6 +21,24 @@ enum LyricStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// How the fullscreen scene is composed. Independent of the lyric style, so any style can run
+/// in either layout.
+enum SceneLayout: String, Codable, CaseIterable, Identifiable, Sendable {
+    /// Lyrics alone in the middle of the screen.
+    case centered
+    /// Now-playing panel on the left, lyrics on the right.
+    case split
+
+    var id: String { rawValue }
+    var displayName: String { self == .centered ? "Centered" : "Split" }
+    var summary: String {
+        switch self {
+        case .centered: return "Lyrics alone, centred on the screen."
+        case .split: return "Artwork and track details on the left, lyrics on the right."
+        }
+    }
+}
+
 enum PaletteMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case automatic, manual
     var id: String { rawValue }
@@ -58,6 +76,7 @@ struct VelaSettings: Codable, Equatable, Sendable {
     /// Multiplier on the base lyric size (0.7...1.6).
     var lyricSize: Double = 1.0
     var lyricStyle: LyricStyle = .stack
+    var sceneLayout: SceneLayout = .centered
     /// Matched symbols beside words in the Stack style.
     var wordIcons: Bool = true
     /// Set once the Stack style has been offered as the default (older settings pre-date it).
@@ -103,6 +122,7 @@ struct VelaSettings: Codable, Equatable, Sendable {
         manualBackground = try c.decodeIfPresent(RGBColor.self, forKey: .manualBackground) ?? base.manualBackground
         lyricSize = try c.decodeIfPresent(Double.self, forKey: .lyricSize) ?? base.lyricSize
         lyricStyle = try c.decodeIfPresent(LyricStyle.self, forKey: .lyricStyle) ?? base.lyricStyle
+        sceneLayout = try c.decodeIfPresent(SceneLayout.self, forKey: .sceneLayout) ?? base.sceneLayout
         wordIcons = try c.decodeIfPresent(Bool.self, forKey: .wordIcons) ?? base.wordIcons
         stackStyleIntroduced = try c.decodeIfPresent(Bool.self, forKey: .stackStyleIntroduced) ?? false
         if !stackStyleIntroduced {
