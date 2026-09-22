@@ -26,6 +26,8 @@ struct SceneUniforms {
     var blobIntensity: (SIMD4<Float>, SIMD4<Float>) = (.zero, .zero)
     var particles: SIMD4<Float> = .zero
     var particles2: SIMD4<Float> = .zero
+    /// ledStrip weight, coverArt weight, LED strip width (px), pad.
+    var look: SIMD4<Float> = .zero
 }
 
 /// Window-geometry inputs that only the view hierarchy knows.
@@ -50,7 +52,7 @@ final class SceneRenderer: NSObject, MTKViewDelegate {
     private let features: FeatureStore
 
     private let geometryLock = OSAllocatedUnfairLock(initialState: SceneGeometry())
-    private struct Artwork { var soft: MTLTexture?; var sharp: MTLTexture? }
+    private struct Artwork { var soft: MTLTexture?; var sharp: MTLTexture?; var cover: MTLTexture? }
     private let artworkLock = OSAllocatedUnfairLock(initialState: (previous: Artwork(), current: Artwork(), fadeStart: -10.0, generation: 0))
 
     private var uniforms = SceneUniforms()
@@ -116,14 +118,15 @@ final class SceneRenderer: NSObject, MTKViewDelegate {
 
     /// Installs new artwork textures and starts a crossfade from the previous ones.
     /// `generation` lets the caller avoid re-uploading unchanged images.
-    func setArtwork(soft: CGImage?, sharp: CGImage?, generation: Int) {
+    func setArtwork(soft: CGImage?, sharp: CGImage?, cover: CGImage? = nil, generation: Int) {
         let alreadyApplied = artworkLock.withLock { $0.generation == generation }
         guard !alreadyApplied else { return }
         let softTexture = soft.flatMap(makeTexture)
         let sharpTexture = sharp.flatMap(makeTexture)
+        let coverTexture = cover.flatMap(makeTexture)
         artworkLock.withLock { state in
             state.previous = state.current
-            state.current = Artwork(soft: softTexture, sharp: sharpTexture ?? softTexture)
+            state.current = Artwork(soft: softTexture, sharp: sharpTexture ?? softTexture, cover: coverTexture ?? sharpTexture ?? softTexture)
             state.fadeStart = CACurrentMediaTimeCompat()
             state.generation = generation
         }
@@ -184,6 +187,10 @@ final class SceneRenderer: NSObject, MTKViewDelegate {
         let particleCount = Int(Double(Self.maximumParticles) * min(1, max(0, state.particleDensity)))
         u.particles = SIMD4(Float(particleCount), (3.5 + 2.5 * Float(state.energy)) * scale, Float(state.particleSpeed), Float(state.particleLifetime))
         u.particles2 = SIMD4(Float(state.particleStreak), Float(state.particleMirror), Float(state.particleDensity), 0)
+        // An LED strip is a few points wide, not tens: it keeps the glow's thickness setting as a
+        // multiplier but starts from a hairline, and stays crisp on any window size.
+        let stripPoints = min(10, max(1.5, 4.5 * Float(state.edgeThickness) / 64))
+        u.look = SIMD4(Float(state.preset.ledStrip), Float(state.preset.coverArt), stripPoints * scale, 0)
         uniforms = u
 
         descriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
@@ -194,6 +201,8 @@ final class SceneRenderer: NSObject, MTKViewDelegate {
         encoder.setFragmentTexture(artwork.previous.sharp ?? artwork.previous.soft ?? placeholder, index: 1)
         encoder.setFragmentTexture(artwork.current.soft ?? placeholder, index: 2)
         encoder.setFragmentTexture(artwork.current.sharp ?? artwork.current.soft ?? placeholder, index: 3)
+        encoder.setFragmentTexture(artwork.previous.cover ?? artwork.previous.soft ?? placeholder, index: 4)
+        encoder.setFragmentTexture(artwork.current.cover ?? artwork.current.soft ?? placeholder, index: 5)
         encoder.setFragmentSamplerState(sampler, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         if particleCount > 0 {

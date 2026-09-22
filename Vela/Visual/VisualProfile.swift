@@ -1,6 +1,8 @@
 import Foundation
 
-/// The musical personalities Vela can render. `Auto` is expressed by `VisualProfileSelection`.
+/// The looks Vela can render. Nine are musical personalities that Auto chooses between from the
+/// genre and the audio; the rest are looks the user picks by hand. `Auto` is expressed by
+/// `VisualProfileSelection`.
 enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
     case rapTrap
     case rockMetal
@@ -11,6 +13,25 @@ enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
     case jazzBlues
     case latinAfrobeats
     case indieAlternative
+    /// A crisp LED strip along the screen edges instead of the diffuse glow.
+    case ledStrip
+    /// The album cover, full screen and sharp, with the lyrics over it and an LED strip around it.
+    case coverArt
+
+    /// The personalities detection chooses between. The hand-picked looks are never detected: no
+    /// genre or sound implies "LED strip".
+    static let genreProfiles: [VisualProfile] = [
+        .rapTrap, .rockMetal, .electronicDance, .pop, .rnbAmbient, .acousticClassical, .jazzBlues,
+        .latinAfrobeats, .indieAlternative,
+    ]
+
+    /// Looks chosen by hand rather than by the music.
+    static let lookProfiles: [VisualProfile] = [.ledStrip, .coverArt]
+
+    var isGenreProfile: Bool { Self.genreProfiles.contains(self) }
+
+    /// Whether this look draws its edge as an LED strip, which owns the screen edge outright.
+    var usesLEDStrip: Bool { VisualProfilePreset.preset(for: self).ledStrip >= 0.5 }
 
     var id: String { rawValue }
 
@@ -25,6 +46,8 @@ enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
         case .jazzBlues: return "Jazz / Blues"
         case .latinAfrobeats: return "Latin / Afrobeats"
         case .indieAlternative: return "Indie / Alternative"
+        case .ledStrip: return "LED Strip"
+        case .coverArt: return "Cover Art"
         }
     }
 
@@ -39,6 +62,8 @@ enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
         case .jazzBlues: return "Smoky amber light, serif lyrics, swing rather than pulse."
         case .latinAfrobeats: return "Tropical colour, syncopated punches, percussive sparkle."
         case .indieAlternative: return "Hazy film grain, muted colour, unhurried drift."
+        case .ledStrip: return "A crisp LED strip hugging the screen edges, lit in the album's accent colour."
+        case .coverArt: return "The album cover fills the screen, lyrics ride on top, an LED strip frames it."
         }
     }
 
@@ -50,8 +75,19 @@ enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
 enum VisualProfileSelection: String, Codable, CaseIterable, Identifiable, Sendable {
     case auto
     case rapTrap, rockMetal, electronicDance, pop, rnbAmbient, acousticClassical, jazzBlues, latinAfrobeats, indieAlternative
+    case ledStrip, coverArt
 
     var id: String { rawValue }
+
+    /// Auto followed by the nine personalities, for the first group of a picker.
+    static var musicSelections: [VisualProfileSelection] {
+        [.auto] + VisualProfile.genreProfiles.map(VisualProfileSelection.init(profile:))
+    }
+
+    /// The hand-picked looks, for the second group of a picker.
+    static var lookSelections: [VisualProfileSelection] {
+        VisualProfile.lookProfiles.map(VisualProfileSelection.init(profile:))
+    }
 
     init(profile: VisualProfile?) {
         guard let profile, let selection = VisualProfileSelection(rawValue: profile.rawValue) else { self = .auto; return }

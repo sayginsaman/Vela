@@ -66,6 +66,7 @@ struct UnsyncedLyricsView: View {
                             Text(line.text)
                                 .font(.system(size: typography.fontSize * 0.7, weight: .semibold))
                                 .foregroundStyle(typography.primaryColor.opacity(0.82))
+                                .legibleOverArtwork(typography)
                                 .multilineTextAlignment(.center)
                                 .frame(maxWidth: proxy.size.width * 0.8)
                         }

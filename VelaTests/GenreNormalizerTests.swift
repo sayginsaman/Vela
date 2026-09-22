@@ -94,6 +94,9 @@ enum SyntheticFeatures {
             f.bpm = 124; f.bpmConfidence = 0.6; f.bassToMid = 0.4; f.spectralCentroid = 0.58; f.highEnergy = 0.48
             f.transientStrength = 0.46; f.rhythmicRegularity = 0.62; f.onsetDensity = 3.5; f.averageLoudness = 0.56
             f.dynamicRange = 0.4; f.spectralFlux = 0.39
+        case .ledStrip, .coverArt:
+            // Looks, not genres: nothing in the music points at them.
+            break
         }
         f.bands = AudioBands(bass: f.bassToMid, mid: 0.5, high: f.highEnergy, level: f.averageLoudness)
         return f

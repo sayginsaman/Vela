@@ -34,7 +34,7 @@ backdrop and thickens the glow, mids move the gradient, highs add fine detail, a
 fire short, smoothed impulses. It never flashes and never strobes. When nothing is playing,
 it settles into a slow breath.
 
-## Nine personalities
+## Nine personalities, two looks
 
 Different music gets a different visual character. Vela listens and picks a profile on its
 own, or you lock one in Settings. Every profile keeps the album artwork as its colour source
@@ -71,6 +71,36 @@ onsets there are and how hard they hit, dynamic range, loudness and rhythmic reg
 waits a few seconds, commits once it is confident, keeps that profile for the rest of the
 track, and only reconsiders if it was unsure to begin with or the music changes for good.
 Profiles crossfade rather than switch. Pop is the neutral fallback.
+
+### Two looks you choose
+
+LED Strip and Cover Art are not personalities Auto can pick. Nothing in the music implies them,
+so detection never lands on them. Choose them from the Profile picker, below the nine.
+
+<table>
+<tr>
+<td align="center" width="50%"><img src="docs/screenshots/led-strip.png" alt="LED Strip: a crisp violet line running round every edge of the window, with a tight bloom and a faint glow spilling inward"><br><b>LED Strip</b><br><sub>One steady line in the accent colour,<br>hugging every edge and corner</sub></td>
+<td align="center" width="50%"><img src="docs/screenshots/cover-art.png" alt="Cover Art: the album cover fills the window, lyrics in the accent colour over it, the sung word on a filled tag, an LED strip framing the screen"><br><b>Cover Art</b><br><sub>The album cover full screen,<br>lyrics on top, framed by the strip</sub></td>
+</tr>
+</table>
+
+**LED Strip** swaps the soft, travelling glow for what a strip of LEDs behind the screen looks
+like: one steady line in the album's accent colour, a tight bloom, and a faint wash of the same
+colour spilling inward. The accent is pushed to full saturation, the way a diode is one pure
+colour, so a muted lavender cover lights a vivid violet strip and a dusty rose one lights hot
+pink. The strip follows the window's rounded corners and the notch exactly. It never travels
+and never widens; the music only moves its brightness. The song-progress hairline steps aside
+while a strip is lit, so the edge stays one unbroken colour.
+
+**Cover Art** puts the album cover behind the lyrics, full screen and sharp, framed by the same
+LED strip. It uses the artwork itself at up to 1400 pixels, not the small blurred backdrop the
+other profiles darken, and switches off everything that would muddy it: gradient light, rings,
+particles and distortion. So the words stay readable on any cover, they take the accent colour
+with a close dark shadow, neighbouring words stay nearly solid, and the word being sung sits on
+a filled tag.
+
+Both looks work with either layout and every lyric style, and the Preview menu can run them for
+ten seconds without touching playback.
 
 ## Settings
 

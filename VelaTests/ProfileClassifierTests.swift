@@ -10,7 +10,7 @@ final class ProfileClassifierTests: XCTestCase {
     }
 
     func testSyntheticFeaturesClassifyToTheirProfile() {
-        for profile in VisualProfile.allCases {
+        for profile in VisualProfile.genreProfiles {
             let result = ProfileClassifier.classify(SyntheticFeatures.make(profile))
             XCTAssertEqual(result.best, profile, "expected \(profile), scores: \(result.scores)")
             XCTAssertGreaterThanOrEqual(result.confidence, ProfileClassifier.lockConfidence, "confidence for \(profile)")
@@ -30,7 +30,7 @@ final class ProfileClassifierTests: XCTestCase {
 
     /// End-to-end: every demo fixture, run through the real extractor, must classify as itself.
     func testFixturesClassifyThroughTheExtractor() {
-        for profile in VisualProfile.allCases {
+        for profile in VisualProfile.genreProfiles {
             let fixture = ProfileFixture(profile: profile)
             var extractor = FeatureExtractor()
             var snapshot = MusicFeatureSnapshot.silent

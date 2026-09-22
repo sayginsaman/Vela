@@ -46,13 +46,19 @@ struct VelaApp: App {
             }
             CommandMenu("Visual") {
                 Picker("Profile", selection: Binding(get: { model.settings.visualProfile }, set: { model.settings.visualProfile = $0 })) {
-                    ForEach(VisualProfileSelection.allCases) { Text($0.displayName).tag($0) }
+                    ForEach(VisualProfileSelection.musicSelections) { Text($0.displayName).tag($0) }
+                    Divider()
+                    ForEach(VisualProfileSelection.lookSelections) { Text($0.displayName).tag($0) }
                 }
                 Button("Cycle Visual Profile") { model.cycleVisualProfile() }
                     .keyboardShortcut("p", modifiers: [.command, .shift])
                 Divider()
                 Menu("Preview Profile") {
-                    ForEach(VisualProfile.allCases) { profile in
+                    ForEach(VisualProfile.genreProfiles) { profile in
+                        Button(profile.displayName) { model.startPreview(profile) }
+                    }
+                    Divider()
+                    ForEach(VisualProfile.lookProfiles) { profile in
                         Button(profile.displayName) { model.startPreview(profile) }
                     }
                 }

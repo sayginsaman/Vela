@@ -158,6 +158,8 @@ final class AppModel {
     private(set) var artwork: CGImage?
     private(set) var backdrop: CGImage?
     private(set) var backdropSharp: CGImage?
+    /// The untreated cover, full resolution, for the Cover Art look.
+    private(set) var backdropCover: CGImage?
     /// Increments whenever new backdrops are installed, so the renderer re-uploads once.
     private(set) var artworkGeneration = 0
     private(set) var extractedPalette: Palette = .fallback
@@ -455,6 +457,7 @@ final class AppModel {
                 artwork = nil
                 backdrop = nil
                 backdropSharp = nil
+                backdropCover = nil
                 artworkGeneration &+= 1
                 extractedPalette = .fallback
             }
@@ -475,6 +478,7 @@ final class AppModel {
                 self.artwork = image
                 self.backdrop = output.backdrop
                 self.backdropSharp = output.backdropSharp
+                self.backdropCover = output.cover
                 self.artworkGeneration &+= 1
                 self.extractedPalette = output.palette
             }

@@ -76,7 +76,7 @@ final class ProfileDetector {
     func ingest(_ features: MusicFeatureSnapshot, at time: TimeInterval) -> ProfileDetection? {
         let instant = ProfileClassifier.classify(features)
         let alpha = smoothedScores.isEmpty ? 1 : configuration.smoothing
-        for profile in VisualProfile.allCases {
+        for profile in VisualProfile.genreProfiles {
             let value = instant.scores[profile] ?? 0
             smoothedScores[profile] = (smoothedScores[profile] ?? 0) + (value - (smoothedScores[profile] ?? 0)) * alpha
         }

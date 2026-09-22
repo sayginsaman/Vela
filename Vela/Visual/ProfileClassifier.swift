@@ -167,7 +167,7 @@ enum ProfileClassifier {
 
     static func classify(_ features: MusicFeatureSnapshot) -> ProfileScores {
         var scores: [VisualProfile: Double] = [:]
-        for profile in VisualProfile.allCases { scores[profile] = score(features, for: profile) }
+        for profile in VisualProfile.genreProfiles { scores[profile] = score(features, for: profile) }
         return summarize(scores)
     }
 

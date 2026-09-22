@@ -11,3 +11,7 @@ xcuserdata/
 *.dSYM.zip
 *.dSYM
 .build/
+
+# Coverage data written by test runs
+*.profraw
+*.profdata

@@ -30,6 +30,10 @@ struct LyricTypography: Equatable {
     /// Decaying beat pulse 0…1, quantised so it only invalidates the current line.
     var beatImpulse: Double = 0
     var beatCount: Int = 0
+    /// The lyrics sit on the album cover itself rather than on a darkened backdrop, so each word
+    /// has to carry its own contrast: a close dark shadow, fuller opacity, and in the Stack style
+    /// the accent colour, as in the Cover Art look.
+    var overArtwork: Bool = false
 
     /// A copy without per-frame values, for lines that are not being sung.
     var still: LyricTypography {
@@ -51,9 +55,21 @@ struct LyricTypography: Equatable {
         return .system(size: fontSize, weight: .bold, design: design)
     }
 
-    var upcomingOpacity: Double { increaseContrast ? 0.62 : 0.36 }
+    var upcomingOpacity: Double { increaseContrast || overArtwork ? 0.62 : 0.36 }
     var completedOpacity: Double { increaseContrast ? 1.0 : 0.9 }
     var primaryColor: Color { increaseContrast ? .white : palette.primary.swiftUIColor }
+
+    /// Opacity of the dark shadow that lifts text off a bright cover; zero on the usual backdrop.
+    /// Legibility, not decoration, so Reduce Effects keeps it.
+    var artworkShadowOpacity: Double { overArtwork ? 0.6 : 0 }
+}
+
+extension View {
+    /// Separates text from a busy, bright background without a visible box behind it.
+    func legibleOverArtwork(_ typography: LyricTypography) -> some View {
+        shadow(color: .black.opacity(typography.artworkShadowOpacity),
+               radius: max(3, typography.fontSize * 0.07), y: max(1, typography.fontSize * 0.02))
+    }
 }
 
 /// One word. Base text in the primary colour with a highlight layer that sweeps across as the

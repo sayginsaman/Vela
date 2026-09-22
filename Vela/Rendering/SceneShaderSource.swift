@@ -28,6 +28,7 @@ enum SceneShaderSource {
         float4 blobIntensity[2];
         float4 particles;        // count, size px, speed, lifetime
         float4 particles2;       // streak, mirror, density, pad
+        float4 look;             // ledStrip, coverArt, strip width px, pad
     };
 
     struct VertexOut {
@@ -72,6 +73,18 @@ enum SceneShaderSource {
         return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
     }
 
+    // Readability ceiling: whatever the music does, the area behind the lyrics stays dark enough
+    // for the text. The ceiling relaxes toward the rim so edge light keeps its colour, and much
+    // further over a cover, where the artwork itself is the point and the words carry a shadow.
+    // Soft compression, so bright moments roll off instead of clipping.
+    static float3 readable(float3 color, float2 vc, float cover) {
+        float rim = smoothstep(0.55, 1.05, length(vc));
+        float ceilingLuma = mix(mix(0.36, 0.72, rim), mix(0.8, 0.95, rim), cover);
+        float luma = dot(color, float3(0.299, 0.587, 0.114));
+        float knee = mix(3.0, 1.5, cover);
+        return color * (1.0 / (1.0 + max(0.0, luma - ceilingLuma) * knee));
+    }
+
     static float3 sampleGradient(constant SceneUniforms &u, float t) {
         int n = max(2, int(u.edge2.w));
         float f = fract(t) * float(n);
@@ -87,22 +100,29 @@ enum SceneShaderSource {
                                   texture2d<float> prevSharp [[texture(1)]],
                                   texture2d<float> nextSoft [[texture(2)]],
                                   texture2d<float> nextSharp [[texture(3)]],
+                                  texture2d<float> prevCover [[texture(4)]],
+                                  texture2d<float> nextCover [[texture(5)]],
                                   sampler s [[sampler(0)]]) {
         float2 res = u.resolutionTime.xy;
         float t = u.resolutionTime.z;
         float aspect = res.x / res.y;
         float2 uv = in.uv;
+        float led = u.look.x;
+        float cover = u.look.y;
 
         // Camera: zoom and tiny impulses (rock), applied around the centre.
         float2 c = (uv - 0.5) / u.camera.z + u.camera.xy;
 
         // Restrained flowing distortion, strongest where the profile asks for it.
-        float dist = u.background.y;
+        // No warping over a cover: the artwork should look like itself.
+        float dist = u.background.y * (1.0 - cover);
         float2 warp = float2(vnoise(c * 2.5 + t * 0.12), vnoise(c * 2.5 - t * 0.1 + 7.0)) - 0.5;
         c += warp * dist * 0.07 * (0.5 + u.bands.x);
 
         // Artwork: aspect-fill of a square texture, breathing with bass.
-        float zoom = 1.12 + u.background.x * 0.07;
+        // The ambient backdrop is overscanned so its blur never shows an edge; the cover is shown
+        // exactly aspect-filled, breathing only slightly with the bass.
+        float zoom = mix(1.12 + u.background.x * 0.07, 1.0 + u.background.x * 0.015, cover);
         float2 fill = aspect >= 1.0 ? float2(c.x, c.y / aspect) : float2(c.x * aspect, c.y);
         float2 auv = clamp(0.5 + fill / zoom, 0.002, 0.998);
         float blurMix = u.background.z;
@@ -114,6 +134,14 @@ enum SceneShaderSource {
         // Base: darkened artwork tinted by the palette background, lifted a little by loudness.
         float3 color = mix(bg, artwork, 0.78) * (0.34 + 0.2 * u.tone.w);
         color = mix(color, bg, 0.12 * u.tone.z);
+
+        // Cover Art: the untreated artwork, bright and sharp, instead of the dark wash.
+        if (cover > 0.001) {
+            float3 pc = prevCover.sample(s, auv).rgb;
+            float3 nc = nextCover.sample(s, auv).rgb;
+            float3 sharpArt = mix(mix(bg, pc, u.flags.x), mix(bg, nc, u.flags.y), u.camera.w);
+            color = mix(color, sharpArt * (0.86 + 0.1 * u.tone.w), cover);
+        }
 
         // Gradient control points: accumulate their light, cap it, then screen-blend once.
         float bloom = u.background.w;
@@ -130,11 +158,12 @@ enum SceneShaderSource {
         }
         float lightLuma = dot(light, float3(0.299, 0.587, 0.114));
         if (lightLuma > 0.45) { light *= 0.45 / lightLuma; }
+        light *= 1.0 - cover;
         color = 1.0 - (1.0 - color) * (1.0 - light);
 
         // Stage spotlight behind the lyrics: a soft pool of the accent colour that swells with loudness.
         float2 sc = (uv - 0.5) * float2(aspect, 1.0);
-        float spot = exp(-dot(sc, sc) * 5.5) * (0.05 + 0.09 * u.flags.z);
+        float spot = exp(-dot(sc, sc) * 5.5) * (0.05 + 0.09 * u.flags.z) * (1.0 - cover);
         color = 1.0 - (1.0 - color) * (1.0 - u.palette[2].rgb * spot);
 
         // Radial pulse in time with the beat (electronic).
@@ -172,7 +201,9 @@ enum SceneShaderSource {
         float noise = hash12(in.uv * res + fract(t) * 97.0) - 0.5;
         color += noise * grain * 0.4;
 
-        // Edge light.
+        // Edge light. `base` is the scene before any of it, so the LED strip can be laid over the
+        // same picture the glow would have lit.
+        float3 base = color;
         float2 px = in.uv * res;
         float2 halfSize = res * 0.5;
         float2 p = px - halfSize;
@@ -216,17 +247,37 @@ enum SceneShaderSource {
         float gnoise = (hash12(px + fract(t) * 53.0) - 0.5) / 96.0;
         glow = clamp(glow + gnoise * glow, 0.0, 1.0);
         float alpha = clamp(core * bright * 0.85, 0.0, 1.0);
-        color = color * (1.0 - alpha) + glowColor * glow;
+        float3 glowed = readable(base * (1.0 - alpha) + glowColor * glow, vc, cover);
 
-        // Readability ceiling: whatever the music does, the area behind the lyrics stays dark
-        // enough for the text. The ceiling relaxes toward the rim so the edge light keeps its
-        // colour. Soft compression, so bright moments roll off instead of clipping.
-        float rim = smoothstep(0.55, 1.05, length(vc));
-        float ceilingLuma = mix(0.36, 0.72, rim);
-        float luma = dot(color, float3(0.299, 0.587, 0.114));
-        color *= 1.0 / (1.0 + max(0.0, luma - ceilingLuma) * 3.0);
+        // LED strip: one steady line hugging the rim, the way a diffused strip behind a screen
+        // reads: a hot core, a tight bloom and a faint wash of the same colour spilling inward.
+        // Its width never changes and it never travels; the music only moves its brightness.
+        // It follows the window's rounded corners (and the notch) exactly, since it is drawn
+        // from the same distance field.
+        float3 lit = glowed;
+        if (led > 0.001) {
+            float w = max(1.0, u.look.z);
+            float stripMask = 1.0 - smoothstep(w - 0.75, w + 0.75, d);
+            float tight = exp(-d / (w * 3.0));
+            float wash = exp(-d / (min(res.x, res.y) * 0.055 * u.edge.z));
+            // A diode is one pure colour at full brightness: take the accent, strip out most of
+            // its grey component and normalise it, so a muted lavender becomes a vivid violet and
+            // a dusty rose becomes hot pink. A truly grey accent stays white.
+            float3 hue = u.palette[2].rgb;
+            float lo = min(min(hue.r, hue.g), hue.b) * 0.75;
+            float hi = max(max(hue.r, hue.g), max(hue.b, 0.001));
+            float3 diode = saturate((hue - lo) / max(hi - lo, 0.001));
+            float pulse = mix(0.9 + 0.2 * levelDrive + 0.3 * u.impulses.y, 0.9 + 0.15 * breath, breathing);
+            float ledBright = u.edge.y * pulse;
+            float3 strip = readable(base, vc, cover);
+            strip = 1.0 - (1.0 - strip) * (1.0 - diode * wash * 0.5 * ledBright);
+            strip = 1.0 - (1.0 - strip) * (1.0 - diode * tight * 1.1 * ledBright);
+            float3 hot = mix(diode, float3(1.0), 0.18) * min(1.0, ledBright * 1.3);
+            strip = mix(strip, hot, stripMask * min(1.0, ledBright * 1.5));
+            lit = mix(glowed, strip, led);
+        }
 
-        return float4(color, 1.0);
+        return float4(lit, 1.0);
     }
 
     // MARK: Particles

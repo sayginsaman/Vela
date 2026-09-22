@@ -182,10 +182,15 @@ private struct StackWordView: View {
 
     private var opacity: Double {
         let d = Double(abs(distance))
+        // Over a cover the neighbours stay nearly solid: faded text disappears into artwork.
+        let artwork = typography.overArtwork
         switch role {
         case .current: return 1
-        case .past: return max(0.14, (typography.increaseContrast ? 0.6 : 0.4) - 0.14 * (d - 1))
-        case .upcoming: return max(0.16, (typography.increaseContrast ? 0.62 : 0.42) - 0.12 * (d - 1))
+        // Past words recede quickly even over a cover: they slide up through each other as the
+        // column advances, and at full strength that crossing reads as a smudge.
+        case .past: return artwork ? max(0.18, 0.75 - 0.3 * (d - 1))
+                                   : max(0.14, (typography.increaseContrast ? 0.6 : 0.4) - 0.14 * (d - 1))
+        case .upcoming: return max(artwork ? 0.3 : 0.16, (artwork ? 0.85 : (typography.increaseContrast ? 0.62 : 0.42)) - 0.12 * (d - 1))
         }
     }
 
@@ -213,7 +218,7 @@ private struct StackWordView: View {
         let text = Text(word.text).font(font).kerning(-fontSize * 0.02)
         HStack(spacing: fontSize * 0.28) {
             ZStack(alignment: .leading) {
-                text.foregroundStyle(typography.primaryColor)
+                text.foregroundStyle(wordColor)
                 if role == .current {
                     tagLayer(text: text)
                 }
@@ -226,17 +231,31 @@ private struct StackWordView: View {
             if let iconName {
                 Image(systemName: iconName)
                     .font(.system(size: fontSize * 0.62, weight: .semibold))
-                    .foregroundStyle(role == .current ? typography.palette.highlight.swiftUIColor : typography.primaryColor)
+                    .foregroundStyle(role == .current || typography.overArtwork ? typography.palette.highlight.swiftUIColor : typography.primaryColor)
                     .transition(.scale(scale: 0.6).combined(with: .opacity))
                     .accessibilityHidden(true)
             }
         }
+        .legibleOverArtwork(typography)
         .frame(maxWidth: maxWidth, alignment: typography.alignment.frameAlignment)
         .opacity(opacity)
         .blur(radius: typography.reduceEffects || role == .current ? 0 : CGFloat(abs(distance)) * 0.8)
         .scaleEffect(role == .current && !typography.reduceMotion ? 1 + 0.03 * typography.beatImpulse : 1)
         .animation(typography.motion.wordAnimation, value: role == .current)
         .animation(.easeOut(duration: 0.2), value: iconName)
+    }
+
+    /// Over a cover every word takes the accent colour, the way the words run in the reference
+    /// look; on the usual backdrop they use the palette's light primary.
+    private var wordColor: Color {
+        typography.overArtwork ? typography.palette.highlight.swiftUIColor : typography.primaryColor
+    }
+
+    /// Letters on the filled tag. Normally the dark background colour; over a cover, white when
+    /// the accent is dark enough to hold it (hot pink, deep blue), so the tag reads like a sticker.
+    private var tagTextColor: Color {
+        if typography.overArtwork, typography.palette.highlight.relativeLuminance < 0.3 { return .white }
+        return typography.palette.background.swiftUIColor
     }
 
     /// Filled tag in the highlight colour that reveals left-to-right with the word's progress; the
@@ -246,7 +265,7 @@ private struct StackWordView: View {
         let insetY = fontSize * 0.02
         let fill = min(1, max(0, progress))
         // The dark text sizes the layer; the tag hangs off it as a background so it hugs the word.
-        return text.foregroundStyle(typography.palette.background.swiftUIColor)
+        return text.foregroundStyle(tagTextColor)
             .background {
                 RoundedRectangle(cornerRadius: fontSize * 0.1, style: .continuous)
                     .fill(typography.palette.highlight.swiftUIColor)

@@ -12,6 +12,8 @@ enum ArtworkProcessor {
         var backdrop: CGImage?
         /// Lightly blurred backdrop the renderer mixes in as loudness rises.
         var backdropSharp: CGImage?
+        /// The artwork itself, squared but otherwise untouched, for the Cover Art look.
+        var cover: CGImage? = nil
     }
 
     static func process(_ image: CGImage?) async -> Output {
@@ -19,8 +21,26 @@ enum ArtworkProcessor {
             let palette = PaletteExtractor.palette(from: image)
             let backdrop = image.flatMap { makeBackdrop(from: $0, blurRadius: 22) }
             let sharp = image.flatMap { makeBackdrop(from: $0, size: 320, blurRadius: 7) }
-            return Output(palette: palette, backdrop: backdrop, backdropSharp: sharp)
+            let cover = image.flatMap { makeCover(from: $0) }
+            return Output(palette: palette, backdrop: backdrop, backdropSharp: sharp, cover: cover)
         }.value
+    }
+
+    /// The cover as a square texture: aspect-filled, capped so a huge source does not cost a huge
+    /// texture, never upscaled, and with no blur or colour treatment. The backdrops above are
+    /// deliberately soft and dark; this one has to hold up full screen.
+    static let maximumCoverSize = 1400
+
+    static func makeCover(from image: CGImage, maxSize: Int = maximumCoverSize) -> CGImage? {
+        let side = max(1, min(maxSize, max(image.width, image.height)))
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        ctx.interpolationQuality = .high
+        let scale = max(CGFloat(side) / CGFloat(image.width), CGFloat(side) / CGFloat(image.height))
+        let w = CGFloat(image.width) * scale, h = CGFloat(image.height) * scale
+        ctx.draw(image, in: CGRect(x: (CGFloat(side) - w) / 2, y: (CGFloat(side) - h) / 2, width: w, height: h))
+        return ctx.makeImage()
     }
 
     static func makeBackdrop(from image: CGImage, size: Int = 220, blurRadius: Float = 22) -> CGImage? {

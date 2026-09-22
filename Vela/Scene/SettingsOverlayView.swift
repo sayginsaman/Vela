@@ -68,7 +68,9 @@ struct SettingsOverlayView: View {
         SettingsSection(title: "Visual profile") {
             LabeledContent("Profile") {
                 Picker("Profile", selection: model.settings.visualProfile) {
-                    ForEach(VisualProfileSelection.allCases) { Text($0.displayName).tag($0) }
+                    ForEach(VisualProfileSelection.musicSelections) { Text($0.displayName).tag($0) }
+                    Divider()
+                    ForEach(VisualProfileSelection.lookSelections) { Text($0.displayName).tag($0) }
                 }
                 .labelsHidden()
                 .frame(width: 180)
@@ -90,7 +92,11 @@ struct SettingsOverlayView: View {
                     Button("Stop") { self.model.stopPreview() }.controlSize(.small)
                 } else {
                     Menu("Preview profile…") {
-                        ForEach(VisualProfile.allCases) { profile in
+                        ForEach(VisualProfile.genreProfiles) { profile in
+                            Button(profile.displayName) { self.model.startPreview(profile) }
+                        }
+                        Divider()
+                        ForEach(VisualProfile.lookProfiles) { profile in
                             Button(profile.displayName) { self.model.startPreview(profile) }
                         }
                     }

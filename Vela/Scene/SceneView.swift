@@ -13,6 +13,7 @@ struct SceneView: View {
             ZStack {
                 ReactiveSceneView(director: model.director, features: model.audio.store,
                                   artworkSoft: model.backdrop, artworkSharp: model.backdropSharp,
+                                  artworkCover: model.backdropCover,
                                   artworkGeneration: model.artworkGeneration,
                                   geometry: model.sceneGeometry)
                     .ignoresSafeArea()
@@ -77,6 +78,11 @@ struct SceneView: View {
         min(layout.size.height - 150, layout.panelWidth * 1.9)
     }
 
+    /// Whether the lyrics are being drawn over the album cover (the Cover Art look, or a preview of it).
+    private var isOverCover: Bool {
+        (model.previewProfile ?? model.effectiveProfile) == .coverArt
+    }
+
     private func typography(for layout: StageLayout) -> LyricTypography {
         let base = layout.typographyBase
         return LyricTypography(fontSize: max(22, base * model.settings.lyricSize),
@@ -85,7 +91,8 @@ struct SceneView: View {
                                reduceEffects: model.settings.reduceEffects,
                                reduceMotion: reduceMotion,
                                increaseContrast: model.increaseContrast,
-                               alignment: layout.alignment)
+                               alignment: layout.alignment,
+                               overArtwork: isOverCover)
     }
 
     @ViewBuilder
@@ -97,7 +104,9 @@ struct SceneView: View {
                 WordStackStageView(box: box, typography: typography, clock: model.clock, offset: model.lyricTimeShift,
                                    director: model.director, showIcons: model.settings.wordIcons)
                     .padding(.vertical, 60)
-                    .background(layout.isSplit || model.settings.reduceEffects ? Color.clear : Color.black.opacity(0.18))
+                    // A light dimming behind the stack on the ambient backdrop; never over a cover,
+                    // where the words carry their own shadow and the artwork should stay bright.
+                    .background(layout.isSplit || model.settings.reduceEffects || isOverCover ? Color.clear : Color.black.opacity(0.18))
             } else {
                 LyricsStageView(box: box, typography: typography, clock: model.clock, offset: model.lyricTimeShift, director: model.director)
                     .padding(.vertical, 60)
@@ -204,8 +213,10 @@ struct SceneView: View {
             // Song progress as a hairline along the bottom edge while the controls are hidden.
             VStack {
                 Spacer()
+                // Hidden under an LED strip: a second, differently coloured line on the strip would
+                // break the one thing an LED look promises, an unbroken edge of a single colour.
                 ProgressHairline()
-                    .opacity(!model.overlayVisible && model.track != nil ? 1 : 0)
+                    .opacity(!model.overlayVisible && model.track != nil && !(model.previewProfile ?? model.effectiveProfile).usesLEDStrip ? 1 : 0)
             }
             .allowsHitTesting(false)
             .animation(.easeInOut(duration: 0.5), value: model.overlayVisible)

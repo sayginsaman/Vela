@@ -8,13 +8,14 @@ struct ReactiveSceneView: View {
     let features: FeatureStore
     let artworkSoft: CGImage?
     let artworkSharp: CGImage?
+    var artworkCover: CGImage? = nil
     let artworkGeneration: Int
     let geometry: SceneGeometry
 
     var body: some View {
         if MTLCreateSystemDefaultDevice() != nil {
             SceneMetalView(director: director, features: features, artworkSoft: artworkSoft, artworkSharp: artworkSharp,
-                           artworkGeneration: artworkGeneration, geometry: geometry)
+                           artworkCover: artworkCover, artworkGeneration: artworkGeneration, geometry: geometry)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         } else {
@@ -30,6 +31,7 @@ struct SceneMetalView: NSViewRepresentable {
     let features: FeatureStore
     let artworkSoft: CGImage?
     let artworkSharp: CGImage?
+    let artworkCover: CGImage?
     let artworkGeneration: Int
     let geometry: SceneGeometry
 
@@ -53,7 +55,7 @@ struct SceneMetalView: NSViewRepresentable {
             view.device = renderer.device
             view.delegate = renderer
             renderer.update(geometry: geometry)
-            renderer.setArtwork(soft: artworkSoft, sharp: artworkSharp, generation: artworkGeneration)
+            renderer.setArtwork(soft: artworkSoft, sharp: artworkSharp, cover: artworkCover, generation: artworkGeneration)
             context.coordinator.renderer = renderer
         }
         return view
@@ -62,7 +64,7 @@ struct SceneMetalView: NSViewRepresentable {
     func updateNSView(_ view: MTKView, context: Context) {
         guard let renderer = context.coordinator.renderer else { return }
         renderer.update(geometry: geometry)
-        renderer.setArtwork(soft: artworkSoft, sharp: artworkSharp, generation: artworkGeneration)
+        renderer.setArtwork(soft: artworkSoft, sharp: artworkSharp, cover: artworkCover, generation: artworkGeneration)
     }
 }
 
