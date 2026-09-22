@@ -40,9 +40,15 @@ xcodebuild -project Vela.xcodeproj -scheme Vela -configuration Release -derivedD
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$IDENTITY" DEVELOPMENT_TEAM="$TEAM" \
   ENABLE_HARDENED_RUNTIME=YES OTHER_CODE_SIGN_FLAGS="--timestamp" MARKETING_VERSION="$VERSION" \
   CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
-  build | grep -E "error:|warning: .*sign|BUILD" || true
+  build > build/release-build.log 2>&1 || { grep -E "error:" build/release-build.log | sort -u; echo "Build failed; see build/release-build.log"; exit 1; }
+grep -E "warning: .*sign|BUILD" build/release-build.log | sort -u || true
 
 APP=build/DerivedData/Build/Products/Release/Vela.app
+# Never sign and ship a stale bundle: the app on disk must be the version being released.
+BUILT_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
+[[ "$BUILT_VERSION" == "$VERSION" ]] || { echo "Built app is $BUILT_VERSION, expected $VERSION; aborting"; exit 1; }
+# A Release app that has been launched gets macOS's app-bundle protection, and the next build
+# cannot write into it. Launch copies for checks, never this bundle.
 
 # Xcode re-signs only the outer Sparkle framework; its nested helpers keep Sparkle's own
 # signature, which notarization rejects. Re-sign them inside-out with our identity, hardened
