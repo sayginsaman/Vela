@@ -66,9 +66,7 @@ struct VisualProfilePreset: Equatable, Sendable {
     /// Seconds a crossfade *into* this profile takes.
     var crossfadeDuration: Double
 
-    // Looks. Weights rather than switches, so a crossfade blends one look into the other.
-    /// 0 = the diffuse travelling glow, 1 = a crisp LED strip hugging the edge.
-    var ledStrip: Double = 0
+    // Looks. A weight rather than a switch, so a crossfade blends one look into the other.
     /// 0 = the darkened, blurred ambient backdrop, 1 = the album cover full screen and sharp.
     var coverArt: Double = 0
 
@@ -85,30 +83,11 @@ struct VisualProfilePreset: Equatable, Sendable {
         case .jazzBlues: return .jazzBlues
         case .latinAfrobeats: return .latinAfrobeats
         case .indieAlternative: return .indieAlternative
-        case .ledStrip: return .ledStrip
         case .coverArt: return .coverArt
         }
     }
 
-    /// The ambient backdrop with the edge drawn as an LED strip: one steady, saturated line in the
-    /// album's accent colour, a tight bloom, and a faint wash of the same colour spilling inward.
-    /// The strip never travels or widens; the music only moves its brightness.
-    static let ledStrip: VisualProfilePreset = {
-        var p = VisualProfilePreset(
-            tempo: 1.0, springResponse: 0.45, springDamping: 0.82, transitionDuration: 0.4,
-            activeWordScale: 1.05, activeWordBloom: 0.7, wordPunch: 2, trackingShift: 0, lineDepth: 0.3,
-            gradientSpeed: 0.7, gradientDistortion: 0.2, orbit: 0.3, liquid: 0.4, compress: 0.3, bloom: 0.6,
-            vignette: 0.55, grain: 0.03, blurReaction: 0.35, cameraMotion: 0, slices: 0, streaks: 0, ring: 0,
-            edgeThickness: 1.0, glowSpread: 1.0, edgeTravel: 0,
-            beatImpulse: 0.7, bassResponse: 0.7, midResponse: 0.6, highResponse: 0.5, onsetResponse: 0.6, idleBreathing: 0.8,
-            particleDensity: 0.2, particleLifetime: 4.0, particleSpeed: 0.5, particleStreak: 0, particleMirror: 0,
-            paletteSaturation: 1.3, paletteContrast: 1.1, paletteWarmth: 0, paletteBrightness: 1.05, highlightEmphasis: 1.25,
-            crossfadeDuration: 1.5)
-        p.ledStrip = 1
-        return p
-    }()
-
-    /// The album cover as the whole background, sharp and bright, framed by the same LED strip.
+    /// The album cover as the whole background, sharp and bright.
     /// Everything that would muddy the artwork (gradient light, rings, particles, distortion) is off.
     static let coverArt: VisualProfilePreset = {
         var p = VisualProfilePreset(
@@ -121,7 +100,6 @@ struct VisualProfilePreset: Equatable, Sendable {
             particleDensity: 0, particleLifetime: 4.0, particleSpeed: 0.5, particleStreak: 0, particleMirror: 0,
             paletteSaturation: 1.3, paletteContrast: 1.1, paletteWarmth: 0, paletteBrightness: 1.05, highlightEmphasis: 1.25,
             crossfadeDuration: 1.5)
-        p.ledStrip = 1
         p.coverArt = 1
         return p
     }()
@@ -245,7 +223,7 @@ struct VisualProfilePreset: Equatable, Sendable {
         \.glowSpread, \.edgeTravel, \.beatImpulse, \.bassResponse, \.midResponse, \.highResponse, \.onsetResponse,
         \.idleBreathing, \.particleDensity, \.particleLifetime, \.particleSpeed, \.particleStreak, \.particleMirror,
         \.paletteSaturation, \.paletteContrast, \.paletteWarmth, \.paletteBrightness, \.highlightEmphasis, \.crossfadeDuration,
-        \.ledStrip, \.coverArt,
+        \.coverArt,
     ]
 
     func interpolated(to other: VisualProfilePreset, amount: Double) -> VisualProfilePreset {

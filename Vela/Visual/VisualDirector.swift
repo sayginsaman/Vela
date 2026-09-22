@@ -100,6 +100,10 @@ struct ReactiveVisualState: Equatable, Sendable {
     var particleSpeed: Double = 1
     var particleStreak: Double = 0
     var particleMirror: Double = 0
+    /// 0 = diffuse glow, 1 = LED strip; eased when the setting changes.
+    var ledStrip: Double = 1
+    /// 0…1 position of the running light along the LED strip, advanced by the music.
+    var ledPhase: Double = 0
     var lyric = LyricMotionSnapshot()
     var isPlaying = false
     var reduceMotion = false
@@ -129,6 +133,8 @@ final class VisualDirector: @unchecked Sendable {
         var glowIntensity: Double = 0.9
         var glowSpread: Double = 1
         var reactiveMotion = true
+        /// Draw the edge as an LED strip (the default) rather than the diffuse glow.
+        var ledStrip = true
         var isPlaying = false
         var trackGeneration = 0
     }
@@ -159,6 +165,8 @@ final class VisualDirector: @unchecked Sendable {
     private var orbitAngle = 0.0
     private var liquidPhase = 0.0
     private var travelPhase = 0.0
+    private var ledPhase = 0.0
+    private var ledMix = AttackReleaseSmoother(attack: 0.6, release: 0.6, initial: 1)
     private var beatCount = 0
     private var lastBeatPhase = 0.0
 
@@ -320,6 +328,13 @@ final class VisualDirector: @unchecked Sendable {
         liquidPhase += dt * preset.gradientSpeed * tempo * (0.15 + 0.6 * preset.liquid)
         let bpmRate = features.bpmConfidence > 0.4 && features.bpm > 0 && live > 0.5 ? Double(features.bpm) / 60 : 0.5
         travelPhase += dt * (0.02 + preset.edgeTravel * bpmRate * 0.25)
+        // The LED strip's running light: a slow drift at rest, faster as the music gets louder,
+        // and a surge on every kick, so the light visibly rides the bass. Integrated here rather
+        // than derived from time in the shader, so a change in speed never makes it jump.
+        let chaseRate = (0.03 + 0.12 * energy.value + 0.5 * kick.value + 0.2 * beat.value)
+            * (0.7 + 0.6 * preset.edgeTravel) * (0.6 + 0.4 * tempo) * (1 - 0.85 * reduceLevel)
+        ledPhase = (ledPhase + dt * chaseRate).truncatingRemainder(dividingBy: 1)
+        ledMix.update(inputs.ledStrip ? 1 : 0, dt: dt)
 
         var blobs: [BlobState] = []
         blobs.reserveCapacity(6)
@@ -377,6 +392,8 @@ final class VisualDirector: @unchecked Sendable {
         state.particleSpeed = preset.particleSpeed * tempo
         state.particleStreak = preset.particleStreak
         state.particleMirror = preset.particleMirror
+        state.ledStrip = ledMix.value
+        state.ledPhase = ledPhase
         state.isPlaying = isPlaying
         state.reduceMotion = inputs.reduceMotion
         state.lyric = LyricMotionSnapshot(style: LyricMotionStyle(preset: preset, reduceMotion: inputs.reduceMotion),

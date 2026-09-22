@@ -26,7 +26,7 @@ struct SceneUniforms {
     var blobIntensity: (SIMD4<Float>, SIMD4<Float>) = (.zero, .zero)
     var particles: SIMD4<Float> = .zero
     var particles2: SIMD4<Float> = .zero
-    /// ledStrip weight, coverArt weight, LED strip width (px), pad.
+    /// ledStrip weight, coverArt weight, LED strip width (px), LED chase phase 0…1.
     var look: SIMD4<Float> = .zero
 }
 
@@ -190,7 +190,7 @@ final class SceneRenderer: NSObject, MTKViewDelegate {
         // An LED strip is a few points wide, not tens: it keeps the glow's thickness setting as a
         // multiplier but starts from a hairline, and stays crisp on any window size.
         let stripPoints = min(10, max(1.5, 4.5 * Float(state.edgeThickness) / 64))
-        u.look = SIMD4(Float(state.preset.ledStrip), Float(state.preset.coverArt), stripPoints * scale, 0)
+        u.look = SIMD4(Float(state.ledStrip), Float(state.preset.coverArt), stripPoints * scale, Float(state.ledPhase))
         uniforms = u
 
         descriptor.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)

@@ -85,6 +85,34 @@ enum SceneShaderSource {
         return color * (1.0 / (1.0 + max(0.0, luma - ceilingLuma) * knee));
     }
 
+    // A diode is one pure colour at full brightness: strip out most of a colour's grey component
+    // and normalise it, so a muted lavender becomes vivid violet and a dusty rose hot pink. A
+    // truly grey colour stays white.
+    static float3 vivid(float3 c) {
+        float lo = min(min(c.r, c.g), c.b) * 0.75;
+        float hi = max(max(c.r, c.g), max(c.b, 0.001));
+        return saturate((c - lo) / max(hi - lo, 0.001));
+    }
+
+    // Position 0…1 along the rim of a rectangle, clockwise from the top-left corner, measured in
+    // real distance so light travels at an even speed along long and short sides alike. Points
+    // inside take the nearest edge; the seam where edges meet only shifts with distance from the
+    // rim, which is where the strip's light has already faded.
+    static float rimPosition(float2 p, float2 hs) {
+        float perimeter = 4.0 * (hs.x + hs.y);
+        float s;
+        if (hs.x - abs(p.x) < hs.y - abs(p.y)) {
+            s = p.x > 0.0 ? 2.0 * hs.x + (p.y + hs.y) : 4.0 * hs.x + 2.0 * hs.y + (hs.y - p.y);
+        } else {
+            s = p.y < 0.0 ? (p.x + hs.x) : 2.0 * hs.x + 2.0 * hs.y + (hs.x - p.x);
+        }
+        return fract(s / perimeter);
+    }
+
+    static float3 screenBlend(float3 a, float3 b) {
+        return 1.0 - (1.0 - a) * (1.0 - saturate(b));
+    }
+
     static float3 sampleGradient(constant SceneUniforms &u, float t) {
         int n = max(2, int(u.edge2.w));
         float f = fract(t) * float(n);
@@ -249,31 +277,57 @@ enum SceneShaderSource {
         float alpha = clamp(core * bright * 0.85, 0.0, 1.0);
         float3 glowed = readable(base * (1.0 - alpha) + glowColor * glow, vc, cover);
 
-        // LED strip: one steady line hugging the rim, the way a diffused strip behind a screen
-        // reads: a hot core, a tight bloom and a faint wash of the same colour spilling inward.
-        // Its width never changes and it never travels; the music only moves its brightness.
-        // It follows the window's rounded corners (and the notch) exactly, since it is drawn
-        // from the same distance field.
+        // LED strip: a line hugging the rim like a strip behind the screen, driven by the music
+        // the way a sound-reactive strip is. The bass swells its width and bloom, every kick
+        // flashes it, light runs along it at a speed the music sets (integrated on the CPU as
+        // look.w), the album's colours flow along its length around the accent, and on the highs
+        // single LEDs twinkle. Drawn from the same distance field as the glow, so it follows the
+        // rounded corners and the notch exactly.
         float3 lit = glowed;
         if (led > 0.001) {
-            float w = max(1.0, u.look.z);
+            float motion = 1.0 - 0.8 * reduce;
+            float kickHit = u.rhythm.x * motion;
+            float beatHit = u.impulses.y * motion;
+            float hat = u.impulses.w * motion;
+            float along_rim = rimPosition(p, halfSize);
+            float phase = u.look.w;
+
+            // The strip itself breathes with the low end.
+            float swell = saturate(bassDrive * 0.9 + kickHit * 0.8);
+            float w = max(1.0, u.look.z * (1.0 + 0.7 * swell));
             float stripMask = 1.0 - smoothstep(w - 0.75, w + 0.75, d);
-            float tight = exp(-d / (w * 3.0));
-            float wash = exp(-d / (min(res.x, res.y) * 0.055 * u.edge.z));
-            // A diode is one pure colour at full brightness: take the accent, strip out most of
-            // its grey component and normalise it, so a muted lavender becomes a vivid violet and
-            // a dusty rose becomes hot pink. A truly grey accent stays white.
-            float3 hue = u.palette[2].rgb;
-            float lo = min(min(hue.r, hue.g), hue.b) * 0.75;
-            float hi = max(max(hue.r, hue.g), max(hue.b, 0.001));
-            float3 diode = saturate((hue - lo) / max(hi - lo, 0.001));
-            float pulse = mix(0.9 + 0.2 * levelDrive + 0.3 * u.impulses.y, 0.9 + 0.15 * breath, breathing);
+            float tight = exp(-d / (w * 3.0 * (1.0 + 0.6 * swell)));
+            float wash = exp(-d / (min(res.x, res.y) * 0.055 * u.edge.z * (1.0 + 0.8 * swell)));
+
+            // Colour: the accent, with the album's other colours drifting along the strip.
+            // Integer multiples of the rim position keep the colours continuous at the seam.
+            float3 accent = vivid(u.palette[2].rgb);
+            float3 flowing = vivid(sampleGradient(u, along_rim * 2.0 - phase * 2.0));
+            float3 diode = mix(accent, flowing, 0.35);
+
+            // Running light: three comets travelling round the rim, a sharp head and a tail
+            // fading behind it. The resting strip sits below full brightness so the comets and
+            // the kicks have headroom to show.
+            float packet = fract(along_rim * 3.0 - phase * 3.0);
+            float comet = max(exp(-(1.0 - packet) * 14.0), exp(-packet * 80.0));
+            float chase = comet * (0.6 + 0.4 * u.edge2.x) * motion;
+
+            // Hi-hats: single LEDs sparkle on the strip itself, never in its bloom.
+            float cell = floor(along_rim * 520.0);
+            float twinkle = step(0.95, hash11(cell * 1.37 + floor(t * 16.0) * 7.1)) * hat * 0.8;
+
+            float pulse = mix(0.88 + 0.2 * levelDrive + 0.45 * kickHit + 0.2 * beatHit,
+                              0.85 + 0.15 * breath, breathing);
             float ledBright = u.edge.y * pulse;
+            float along = 1.0 + chase * (1.2 + 1.2 * kickHit);
+
             float3 strip = readable(base, vc, cover);
-            strip = 1.0 - (1.0 - strip) * (1.0 - diode * wash * 0.5 * ledBright);
-            strip = 1.0 - (1.0 - strip) * (1.0 - diode * tight * 1.1 * ledBright);
-            float3 hot = mix(diode, float3(1.0), 0.18) * min(1.0, ledBright * 1.3);
-            strip = mix(strip, hot, stripMask * min(1.0, ledBright * 1.5));
+            strip = screenBlend(strip, diode * wash * (0.5 + 0.4 * swell) * ledBright * (0.7 + 0.3 * along));
+            strip = screenBlend(strip, diode * tight * ledBright * along);
+            float coreLevel = saturate(ledBright * 0.95 * along);
+            float3 hot = mix(diode, float3(1.0), 0.15 + 0.35 * saturate(chase) + 0.6 * twinkle)
+                * saturate(coreLevel + twinkle * 0.6);
+            strip = mix(strip, hot, stripMask * saturate(ledBright * 1.5 * along + twinkle));
             lit = mix(glowed, strip, led);
         }
 

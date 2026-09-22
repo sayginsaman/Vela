@@ -13,8 +13,6 @@ enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
     case jazzBlues
     case latinAfrobeats
     case indieAlternative
-    /// A crisp LED strip along the screen edges instead of the diffuse glow.
-    case ledStrip
     /// The album cover, full screen and sharp, with the lyrics over it and an LED strip around it.
     case coverArt
 
@@ -26,12 +24,13 @@ enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
     ]
 
     /// Looks chosen by hand rather than by the music.
-    static let lookProfiles: [VisualProfile] = [.ledStrip, .coverArt]
+    static let lookProfiles: [VisualProfile] = [.coverArt]
 
     var isGenreProfile: Bool { Self.genreProfiles.contains(self) }
 
-    /// Whether this look draws its edge as an LED strip, which owns the screen edge outright.
-    var usesLEDStrip: Bool { VisualProfilePreset.preset(for: self).ledStrip >= 0.5 }
+    /// Cover Art shows the lyrics alone over the cover, so it never uses the split layout: the
+    /// panel would put the same artwork a second time beside the words.
+    var allowsSplitLayout: Bool { self != .coverArt }
 
     var id: String { rawValue }
 
@@ -46,7 +45,6 @@ enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
         case .jazzBlues: return "Jazz / Blues"
         case .latinAfrobeats: return "Latin / Afrobeats"
         case .indieAlternative: return "Indie / Alternative"
-        case .ledStrip: return "LED Strip"
         case .coverArt: return "Cover Art"
         }
     }
@@ -62,8 +60,7 @@ enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
         case .jazzBlues: return "Smoky amber light, serif lyrics, swing rather than pulse."
         case .latinAfrobeats: return "Tropical colour, syncopated punches, percussive sparkle."
         case .indieAlternative: return "Hazy film grain, muted colour, unhurried drift."
-        case .ledStrip: return "A crisp LED strip hugging the screen edges, lit in the album's accent colour."
-        case .coverArt: return "The album cover fills the screen, lyrics ride on top, an LED strip frames it."
+        case .coverArt: return "The album cover fills the screen, and the lyrics ride on top of it, centred."
         }
     }
 
@@ -75,9 +72,17 @@ enum VisualProfile: String, Codable, CaseIterable, Identifiable, Sendable {
 enum VisualProfileSelection: String, Codable, CaseIterable, Identifiable, Sendable {
     case auto
     case rapTrap, rockMetal, electronicDance, pop, rnbAmbient, acousticClassical, jazzBlues, latinAfrobeats, indieAlternative
-    case ledStrip, coverArt
+    case coverArt
 
     var id: String { rawValue }
+
+    /// Unknown values fall back to Auto instead of failing, so a selection that no longer exists
+    /// (LED Strip was a profile in 2.3 before becoming every profile's edge) cannot take the
+    /// rest of the saved settings down with it.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = VisualProfileSelection(rawValue: raw) ?? .auto
+    }
 
     /// Auto followed by the nine personalities, for the first group of a picker.
     static var musicSelections: [VisualProfileSelection] {

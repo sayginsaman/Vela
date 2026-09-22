@@ -18,7 +18,7 @@ struct ProfileFixture: Sendable, Equatable {
         case .rockMetal: return 152
         case .electronicDance: return 128
         // The hand-picked looks have no music of their own; previews play the Pop pattern.
-        case .pop, .ledStrip, .coverArt: return 112
+        case .pop, .coverArt: return 112
         case .rnbAmbient: return 84
         case .acousticClassical: return 72
         case .jazzBlues: return 118
@@ -83,7 +83,7 @@ struct ProfileFixture: Sendable, Equatable {
             high = (0.12 + 0.6 * offHat + 0.3 * clap) * (0.85 + 0.15 * section) + riser * 0.3
             centroid = 0.5 + 0.12 * riser + 0.05 * clap
             transient = kick * (0.7 + 0.3 * section) + clap * 0.9 + offHat * 0.55
-        case .pop, .ledStrip, .coverArt:
+        case .pop, .coverArt:
             // Kick 1 & 3 with a bass synth, snare 2 & 4, 8th hats, chorus every other 8 bars.
             let chorus = Int(bar / 8).isMultiple(of: 2) ? 0.0 : 1.0
             let energy = 0.7 + 0.3 * chorus

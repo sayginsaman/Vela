@@ -93,6 +93,27 @@ struct SceneArrangement: Codable, Equatable, Sendable {
     }
 }
 
+/// How the screen edge is lit. The LED strip is the default for every profile; the diffuse glow
+/// from earlier versions stays available.
+enum EdgeLightStyle: String, Codable, CaseIterable, Identifiable, Sendable {
+    case ledStrip, glow
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .ledStrip: return "LED strip"
+        case .glow: return "Glow"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .ledStrip: return "A crisp strip along every edge that swells with the bass, flashes on the kick and runs with the music."
+        case .glow: return "A soft, wide glow that drifts around the edge."
+        }
+    }
+}
+
 struct VelaSettings: Codable, Equatable, Sendable {
     var paletteMode: PaletteMode = .automatic
     var manualHighlight: RGBColor = Palette.fallback.highlight
@@ -139,6 +160,8 @@ struct VelaSettings: Codable, Equatable, Sendable {
     var lyricArrangement = SceneArrangement()
     /// Where the now-playing panel sits and how big it is, in the split layout.
     var panelArrangement = SceneArrangement()
+    /// How the screen edge is lit.
+    var edgeLightStyle: EdgeLightStyle = .ledStrip
 
     static let reactionRange: ClosedRange<Double> = 0...1.5
 
@@ -183,6 +206,7 @@ struct VelaSettings: Codable, Equatable, Sendable {
         localAlignment = try c.decodeIfPresent(Bool.self, forKey: .localAlignment) ?? base.localAlignment
         lyricArrangement = try c.decodeIfPresent(SceneArrangement.self, forKey: .lyricArrangement) ?? base.lyricArrangement
         panelArrangement = try c.decodeIfPresent(SceneArrangement.self, forKey: .panelArrangement) ?? base.panelArrangement
+        edgeLightStyle = (try? c.decodeIfPresent(EdgeLightStyle.self, forKey: .edgeLightStyle)) ?? base.edgeLightStyle
     }
 
     static let lyricSizeRange: ClosedRange<Double> = 0.7...1.6

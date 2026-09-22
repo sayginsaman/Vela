@@ -7,7 +7,7 @@
 **Lyrics and light for whatever is playing.**
 
 Word-synced lyrics in the middle of the screen, colours pulled from the album art, and an
-ambient glow around the edges of the display that moves with the music.
+LED strip of light around the edges of the display that moves with the music.
 Works with Spotify and Apple Music on macOS. No accounts, no keys.
 
 <img src="docs/screenshots/rap-trap.png" width="820" alt="Vela in full screen: a dark scene with the current lyric line large in the centre, the word being sung lit in the album's accent colour, and a soft light around the edges of the display">
@@ -29,12 +29,15 @@ in a small badge. Plain lyrics fall back to a slow, unsynced scroll. By default 
 arrive one at a time down the middle of the screen, each lit as it is sung, at whatever pace
 the song sets; a line-based view is one click away.
 
-The light around the display is drawn on the GPU from the album palette. Bass expands the
-backdrop and thickens the glow, mids move the gradient, highs add fine detail, and beats
-fire short, smoothed impulses. It never flashes and never strobes. When nothing is playing,
-it settles into a slow breath.
+The light around the display is an LED strip drawn on the GPU from the album palette, on
+every profile. Bass swells the strip and its bloom, each kick brightens it, light runs along
+it faster as the music gets louder, and hi-hats make single LEDs sparkle. The album's colours
+drift along its length around the accent colour. Kicks brighten it in short, smoothed pulses
+rather than hard on-off flashes, and Reduce Motion calms the running light to a slow drift.
+When nothing is playing, it settles into a slow breath. The soft glow from earlier versions
+is one setting away, under Ambient light.
 
-## Nine personalities, two looks
+## Nine personalities
 
 Different music gets a different visual character. Vela listens and picks a profile on its
 own, or you lock one in Settings. Every profile keeps the album artwork as its colour source
@@ -72,35 +75,36 @@ waits a few seconds, commits once it is confident, keeps that profile for the re
 track, and only reconsiders if it was unsure to begin with or the music changes for good.
 Profiles crossfade rather than switch. Pop is the neutral fallback.
 
-### Two looks you choose
+### LED strip on every profile
 
-LED Strip and Cover Art are not personalities Auto can pick. Nothing in the music implies them,
-so detection never lands on them. Choose them from the Profile picker, below the nine.
+Every profile lights the screen edge the same way, as an LED strip, and colours and drives it
+in its own character. The strip is one crisp line hugging the window's rounded corners and the
+notch, with a tight bloom and a wash of the same colour spilling inward. The accent colour is
+pushed to full saturation, the way a diode is one pure colour, so a muted lavender cover lights
+a vivid violet strip and a dusty rose one lights hot pink.
 
-<table>
-<tr>
-<td align="center" width="50%"><img src="docs/screenshots/led-strip.png" alt="LED Strip: a crisp violet line running round every edge of the window, with a tight bloom and a faint glow spilling inward"><br><b>LED Strip</b><br><sub>One steady line in the accent colour,<br>hugging every edge and corner</sub></td>
-<td align="center" width="50%"><img src="docs/screenshots/cover-art.png" alt="Cover Art: the album cover fills the window, lyrics in the accent colour over it, the sung word on a filled tag, an LED strip framing the screen"><br><b>Cover Art</b><br><sub>The album cover full screen,<br>lyrics on top, framed by the strip</sub></td>
-</tr>
-</table>
+It moves with the music. The low end swells its width and bloom, every kick brightens it, and
+three comets of light run round it at a speed the music sets: a slow drift at rest, faster as
+the song gets louder, with a surge on each kick. Hi-hats make single LEDs sparkle. Electronic
+runs its light hardest and Acoustic keeps it calm, so the profiles still feel different. The
+song-progress hairline stays hidden while the strip is lit, so the edge is one unbroken light.
 
-**LED Strip** swaps the soft, travelling glow for what a strip of LEDs behind the screen looks
-like: one steady line in the album's accent colour, a tight bloom, and a faint wash of the same
-colour spilling inward. The accent is pushed to full saturation, the way a diode is one pure
-colour, so a muted lavender cover lights a vivid violet strip and a dusty rose one lights hot
-pink. The strip follows the window's rounded corners and the notch exactly. It never travels
-and never widens; the music only moves its brightness. The song-progress hairline steps aside
-while a strip is lit, so the edge stays one unbroken colour.
+### Cover Art
 
-**Cover Art** puts the album cover behind the lyrics, full screen and sharp, framed by the same
-LED strip. It uses the artwork itself at up to 1400 pixels, not the small blurred backdrop the
-other profiles darken, and switches off everything that would muddy it: gradient light, rings,
-particles and distortion. So the words stay readable on any cover, they take the accent colour
-with a close dark shadow, neighbouring words stay nearly solid, and the word being sung sits on
-a filled tag.
+Cover Art is the one look you choose rather than one the music implies, so Auto never lands on
+it. Pick it from the Profile picker, below the nine.
 
-Both looks work with either layout and every lyric style, and the Preview menu can run them for
-ten seconds without touching playback.
+<div align="center">
+<img src="docs/screenshots/cover-art.png" width="820" alt="Cover Art: the album cover fills the window, centred lyrics in the accent colour over it, the sung word on a filled tag, an LED strip framing the screen">
+</div>
+
+The album cover fills the screen behind the lyrics, sharp and bright, and nothing else shares
+the stage: no side panel repeating the artwork and no title card, just the cover and the words,
+centred. It always uses the centred layout, even if Split is chosen. The artwork is used itself
+at up to 1400 pixels, not the small blurred backdrop the other profiles darken, and everything
+that would muddy it is off: gradient light, rings, particles and distortion. So the words stay
+readable on any cover, they take the accent colour with a close dark shadow, neighbouring words
+stay nearly solid, and the word being sung sits on a filled tag.
 
 ## Settings
 
@@ -108,8 +112,8 @@ Everything lives in one translucent panel over the scene: the visual profile, fo
 how strongly the scene reacts (overall, background, edge light, lyric motion), particles, a
 gentler-motion toggle, a ten-second preview of any profile without touching playback, an
 Analysis disclosure that shows what the detector is currently hearing, the lyric layout (centred
-or split), where the elements sit and how big they are, your own Musixmatch key, and local
-alignment.
+or split), where the elements sit and how big they are, the edge light (LED strip or glow), your
+own Musixmatch key, and local alignment.
 
 ## Install
 
@@ -269,7 +273,8 @@ Everything lives in one app target, grouped by responsibility:
   intensities into one attack/release-smoothed `ReactiveVisualState` per frame.
 - `Rendering/` — `SceneRenderer` (Metal: artwork backdrop with bass expansion and restrained
   warp, six palette control points that orbit/flow/compress, beat rings, hi-hat slices, drum
-  streaks, vignette, grain, the SDF edge light with travelling head, plus an instanced particle
+  streaks, vignette, grain, the SDF edge light as a music-driven LED strip or a diffuse glow,
+  the untreated cover for Cover Art, plus an instanced particle
   pass capped at 160 sprites; paused when occluded or minimised) and a SwiftUI `Canvas`
   fallback for machines without Metal.
 - `Scene/` — the SwiftUI stage: `LyricsStageView` samples the playback clock each frame,

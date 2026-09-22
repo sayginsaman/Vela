@@ -7,7 +7,9 @@ struct SceneView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let layout = StageLayout(size: proxy.size, split: model.settings.sceneLayout == .split && model.track != nil,
+            let layout = StageLayout(size: proxy.size,
+                                     split: StageLayout.wantsSplit(model.settings.sceneLayout, hasTrack: model.track != nil,
+                                                                   profile: model.previewProfile ?? model.effectiveProfile),
                                      lyric: model.settings.lyricArrangement, panel: model.settings.panelArrangement)
             let typography = typography(for: layout)
             ZStack {
@@ -216,12 +218,13 @@ struct SceneView: View {
                 // Hidden under an LED strip: a second, differently coloured line on the strip would
                 // break the one thing an LED look promises, an unbroken edge of a single colour.
                 ProgressHairline()
-                    .opacity(!model.overlayVisible && model.track != nil && !(model.previewProfile ?? model.effectiveProfile).usesLEDStrip ? 1 : 0)
+                    .opacity(!model.overlayVisible && model.track != nil && model.settings.edgeLightStyle != .ledStrip ? 1 : 0)
             }
             .allowsHitTesting(false)
             .animation(.easeInOut(duration: 0.5), value: model.overlayVisible)
 
-            if model.introVisible, !model.overlayVisible, !model.isArrangingScene, let track = model.track {
+            // Cover Art is the cover and the lyrics, nothing else, so the title card stays away.
+            if model.introVisible, !model.overlayVisible, !model.isArrangingScene, !isOverCover, let track = model.track {
                 VStack {
                     Spacer()
                     HStack {
@@ -359,6 +362,12 @@ struct StageLayout: Equatable {
         let wanted = min(Self.maximumLyricWidth, max(420, size.width * 0.42)) * lyric.scale
         lyricWidth = min(room, wanted)
         contentWidth = panelWidth + gap + lyricWidth
+    }
+
+    /// The split layout needs a track to describe and a profile that allows it. Cover Art does
+    /// not: its background already is the artwork, so the panel would show it twice.
+    static func wantsSplit(_ layout: SceneLayout, hasTrack: Bool, profile: VisualProfile) -> Bool {
+        layout == .split && hasTrack && profile.allowsSplitLayout
     }
 
     /// Both columns together, centred in the stage, rather than pinned to its edges.

@@ -309,6 +309,7 @@ final class AppModel {
         inputs.glowIntensity = s.glowIntensity
         inputs.glowSpread = s.glowSpread
         inputs.reactiveMotion = s.reactiveMotion
+        inputs.ledStrip = s.edgeLightStyle == .ledStrip
         inputs.isPlaying = playback.isPlaying
         inputs.trackGeneration = trackGeneration
         director.update(inputs: inputs)

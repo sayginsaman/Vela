@@ -199,6 +199,10 @@ struct SettingsOverlayView: View {
             .labelsHidden()
             Text(self.model.settings.sceneLayout.summary)
                 .font(.system(size: 11)).foregroundStyle(.secondary)
+            if !self.model.effectiveProfile.allowsSplitLayout, self.model.settings.sceneLayout == .split {
+                Text("Cover Art always shows the lyrics alone, centred over the cover.")
+                    .font(.system(size: 11)).foregroundStyle(.tertiary)
+            }
             Picker("Style", selection: model.settings.lyricStyle) {
                 ForEach(LyricStyle.allCases) { Text($0.displayName).tag($0) }
             }
@@ -253,6 +257,14 @@ struct SettingsOverlayView: View {
 
     private func lightSection(model: Bindable<AppModel>) -> some View {
         SettingsSection(title: "Ambient light") {
+            Picker("Edge light", selection: model.settings.edgeLightStyle) {
+                ForEach(EdgeLightStyle.allCases) { Text($0.displayName).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            Text(self.model.settings.edgeLightStyle.summary)
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Picker("Palette", selection: model.settings.paletteMode) {
                 ForEach(PaletteMode.allCases) { Text($0.displayName).tag($0) }
             }
